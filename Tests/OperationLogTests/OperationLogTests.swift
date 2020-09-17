@@ -1,12 +1,10 @@
 import XCTest
 @testable import OperationLog
 
+
 final class OperationLogTests: XCTestCase {
 
-    func testExample() {
+    func testAddingOperation() {
+        
     }
-
-    static var allTests = [
-        ("testExample", testExample),
-    ]
 }

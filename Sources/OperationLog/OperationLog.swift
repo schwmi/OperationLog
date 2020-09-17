@@ -2,11 +2,11 @@ import Foundation
 import VectorClock
 
 
-struct OperationLog<ActorID: Comparable & Hashable & Codable> {
+struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: OperationProtocol> {
 
     struct OperationContainer: Equatable, Hashable {
 
-        static func == (lhs: OperationLog<ActorID>.OperationContainer, rhs: OperationLog<ActorID>.OperationContainer) -> Bool {
+        static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
             return lhs.clock == rhs.clock
         }
 
@@ -43,13 +43,16 @@ struct OperationLog<ActorID: Comparable & Hashable & Codable> {
     }
 }
 
-protocol Operation {
+public protocol OperationProtocol {
+
+    associatedtype SnapshotType: Snapshot
+
     var description: String? { get }
-    func apply(to snapshot: Snapshot) -> Snapshot
+    func apply(to snapshot: SnapshotType) -> SnapshotType
     func serialize() -> Data
-    func reverted() -> Operation
+    func reverted() -> Self
 }
 
-protocol Snapshot {
+public protocol Snapshot {
     func serialize() -> Data
 }
