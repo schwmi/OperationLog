@@ -1,3 +1,4 @@
+import Foundation
 import VectorClock
 
 
@@ -11,7 +12,16 @@ struct OperationLog<ActorID: Comparable & Hashable & Codable> {
         self.actorID = actorID
     }
 
-    func appendOperation() {
-
+    func append(_ operation: Operation) {
     }
+}
+
+protocol Operation {
+    var description: String? { get }
+    func apply(to snapshot: Snapshot) -> Snapshot
+    func serialize() -> Data
+}
+
+protocol Snapshot {
+    func serialize() -> Data
 }
