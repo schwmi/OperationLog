@@ -41,6 +41,10 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
 
     // MARK: - OperationLog
 
+    func logDescriptions(limit: Int) -> [String] {
+        return self.operations.suffix(limit).map { $0.operation.description ?? " - no description - " }
+    }
+
     public mutating func append(_ operation: Operation) {
         self.operations.append(.init(clock: self.currentClock.incrementing(self.actorID), operation: operation))
     }

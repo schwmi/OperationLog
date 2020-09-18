@@ -13,4 +13,12 @@ final class OperationLogTests: XCTestCase {
         let result = log.reduce(into: snapshot)
         XCTAssertEqual(result.string, "Result: ABC")
     }
+
+    func testLogDescription() {
+        var log = OperationLog<String, CharacterOperation>(actorID: "A")
+        log.append(.init(kind: .append, character: "A"))
+        log.append(.init(kind: .append, character: "B"))
+        log.append(.init(kind: .removeLast, character: "C"))
+        XCTAssertEqual(log.logDescriptions(limit: 2), ["Append character: B", "removeLast character: C"])
+    }
 }
