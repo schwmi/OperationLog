@@ -22,16 +22,7 @@ public protocol Snapshot {
 /// Holds a vector clock sorted array of operations
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
-    struct OperationContainer: Equatable, Hashable {
-
-        static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
-            return lhs.clock == rhs.clock
-        }
-
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(self.clock)
-        }
-
+    struct OperationContainer {
         let clock: VectorClock<ActorID>
         let operation: Operation
     }
@@ -51,8 +42,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     // MARK: - OperationLog
 
     public mutating func append(_ operation: Operation) {
-        self.operations.append(.init(clock: self.currentClock.incrementing(self.actorID),
-                                     operation: operation))
+        self.operations.append(.init(clock: self.currentClock.incrementing(self.actorID), operation: operation))
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
@@ -62,5 +52,18 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
 
     public func reduce(into snapshot: Operation.SnapshotType) -> Operation.SnapshotType {
         return self.operations.reduce(snapshot, { $1.operation.apply(to: $0) } )
+    }
+}
+
+// MARK: OperationContainer: Hashable, Equatable
+
+extension OperationLog.OperationContainer: Equatable, Hashable {
+
+    static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
+        return lhs.clock == rhs.clock
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(self.clock)
     }
 }
