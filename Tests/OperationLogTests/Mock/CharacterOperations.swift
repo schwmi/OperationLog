@@ -40,8 +40,7 @@ struct CharacterOperation: LogOperation {
     }
 
     func serialize() throws -> Data {
-        let json = try JSONEncoder().encode(self)
-        return json
+        return try JSONEncoder().encode(self)
     }
 
     func reverted() -> Self {

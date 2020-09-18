@@ -2,7 +2,25 @@ import Foundation
 import VectorClock
 
 
-struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
+/// Operation which can be stored in the log
+public protocol LogOperation {
+
+    associatedtype SnapshotType: Snapshot
+
+    var description: String? { get }
+    func apply(to snapshot: SnapshotType) -> SnapshotType
+    func serialize() throws -> Data
+    func reverted() -> Self
+}
+
+/// Reduced form of n operations at a given point in time
+public protocol Snapshot {
+    func serialize() throws -> Data
+}
+
+
+/// Holds a vector clock sorted array of operations
+public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
     struct OperationContainer: Equatable, Hashable {
 
@@ -45,18 +63,4 @@ struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOper
     public func reduce(into snapshot: Operation.SnapshotType) -> Operation.SnapshotType {
         return self.operations.reduce(snapshot, { $1.operation.apply(to: $0) } )
     }
-}
-
-public protocol LogOperation {
-
-    associatedtype SnapshotType: Snapshot
-
-    var description: String? { get }
-    func apply(to snapshot: SnapshotType) -> SnapshotType
-    func serialize() throws -> Data
-    func reverted() -> Self
-}
-
-public protocol Snapshot {
-    func serialize() -> Data
 }
