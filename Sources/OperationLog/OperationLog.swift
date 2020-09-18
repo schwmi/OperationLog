@@ -53,7 +53,7 @@ public protocol LogOperation {
 
     var description: String? { get }
     func apply(to snapshot: SnapshotType) -> SnapshotType
-    func serialize() -> Data
+    func serialize() throws -> Data
     func reverted() -> Self
 }
 
