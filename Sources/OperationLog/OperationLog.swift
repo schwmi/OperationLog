@@ -2,7 +2,7 @@ import Foundation
 import VectorClock
 
 
-struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: OperationProtocol> {
+struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
     struct OperationContainer: Equatable, Hashable {
 
@@ -32,18 +32,22 @@ struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: Operati
 
     // MARK: - OperationLog
 
-    mutating func append(_ operation: Operation) {
+    public mutating func append(_ operation: Operation) {
         self.operations.append(.init(clock: self.currentClock.incrementing(self.actorID),
                                      operation: operation))
     }
 
-    mutating func merge(_ operationLog: OperationLog) {
+    public mutating func merge(_ operationLog: OperationLog) {
         let allOperations = Set(operationLog.operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
     }
+
+    public func reduce(into snapshot: Operation.SnapshotType) -> Operation.SnapshotType {
+        return self.operations.reduce(snapshot, { $1.operation.apply(to: $0) } )
+    }
 }
 
-public protocol OperationProtocol {
+public protocol LogOperation {
 
     associatedtype SnapshotType: Snapshot
 
