@@ -23,6 +23,7 @@ public protocol Snapshot {
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
     struct OperationContainer {
+        let actor: ActorID
         let clock: VectorClock<ActorID>
         let operation: Operation
     }
@@ -46,7 +47,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     public mutating func append(_ operation: Operation) {
-        self.operations.append(.init(clock: self.currentClock.incrementing(self.actorID), operation: operation))
+        self.operations.append(.init(actor: self.actorID, clock: self.currentClock.incrementing(self.actorID), operation: operation))
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
