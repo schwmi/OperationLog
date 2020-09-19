@@ -21,4 +21,17 @@ final class OperationLogTests: XCTestCase {
         log.append(.init(kind: .removeLast, character: "C"))
         XCTAssertEqual(log.logDescriptions(limit: 2), ["Append character: B", "removeLast character: C"])
     }
+
+    func testLogMerging() {
+        var logA = OperationLog<String, CharacterOperation>(actorID: "A")
+        var logB = OperationLog<String, CharacterOperation>(actorID: "B")
+        logA.append(.init(kind: .append, character: "A"))
+        logB.append(.init(kind: .append, character: "B"))
+        logA.merge(logB)
+        logB.merge(logA)
+        let resultA = logA.reduce(into: .init(string: ""))
+        let resultB = logB.reduce(into: .init(string: ""))
+        XCTAssertEqual(resultA.string, resultB.string)
+        XCTAssertEqual(resultA.string, "AB")
+    }
 }
