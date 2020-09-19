@@ -1,4 +1,5 @@
 import XCTest
+import VectorClock
 @testable import OperationLog
 
 
@@ -26,12 +27,24 @@ final class OperationLogTests: XCTestCase {
         var logA = OperationLog<String, CharacterOperation>(actorID: "A")
         var logB = OperationLog<String, CharacterOperation>(actorID: "B")
         logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "A"))
+        logB.append(.init(kind: .append, character: "B"))
+        logB.merge(logA)
+        logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "A"))
+        logB.merge(logA)
+        logA.append(.init(kind: .append, character: "A"))
+        logB.append(.init(kind: .append, character: "B"))
+        logA.merge(logB)
+        logB.append(.init(kind: .append, character: "B"))
         logB.append(.init(kind: .append, character: "B"))
         logA.merge(logB)
         logB.merge(logA)
         let resultA = logA.reduce(into: .init(string: ""))
         let resultB = logB.reduce(into: .init(string: ""))
+        print(logA.currentClock)
         XCTAssertEqual(resultA.string, resultB.string)
-        XCTAssertEqual(resultA.string, "AB")
+        XCTAssertEqual(resultA.string, "AAABAAABBB")
     }
 }

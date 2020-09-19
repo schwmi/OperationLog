@@ -28,16 +28,18 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
         let operation: Operation
     }
 
-    private let actorID: ActorID
     private var operations: [OperationContainer] = []
-    private var currentClock: VectorClock<ActorID> {
-        return operations.last?.clock ?? VectorClock(actorID: self.actorID)
-    }
+
+    // MARK: - Properties
+
+    let actorID: ActorID
+    private(set) var currentClock: VectorClock<ActorID>
 
     // MARK: - Lifecycle
 
     init(actorID: ActorID) {
         self.actorID = actorID
+        self.currentClock = VectorClock(actorID: self.actorID)
     }
 
     // MARK: - OperationLog
@@ -47,10 +49,12 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     public mutating func append(_ operation: Operation) {
-        self.operations.append(.init(actor: self.actorID, clock: self.currentClock.incrementing(self.actorID), operation: operation))
+        self.currentClock = self.currentClock.incrementing(self.actorID)
+        self.operations.append(.init(actor: self.actorID, clock: self.currentClock, operation: operation))
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
+        self.currentClock = self.currentClock.merging(operationLog.currentClock)
         let allOperations = Set(operationLog.operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
     }
