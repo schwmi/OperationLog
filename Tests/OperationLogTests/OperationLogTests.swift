@@ -43,7 +43,6 @@ final class OperationLogTests: XCTestCase {
         logB.merge(logA)
         let resultA = logA.reduce(into: .init(string: ""))
         let resultB = logB.reduce(into: .init(string: ""))
-        print(logA.currentClock)
         XCTAssertEqual(resultA.string, resultB.string)
         XCTAssertEqual(resultA.string, "AAABAAABBB")
     }

@@ -34,7 +34,6 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     // MARK: - Properties
 
     let actorID: ActorID
-    var currentClock: VectorClock<ActorID> { return self.clockProvider.currentClock }
 
     // MARK: - Lifecycle
 
@@ -56,7 +55,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
-        self.clockProvider.merge(operationLog.currentClock)
+        self.clockProvider.merge(operationLog.clockProvider)
         let allOperations = Set(operationLog.operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
     }
@@ -84,10 +83,7 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
 private struct ClockProvider<ActorID: Comparable & Hashable & Codable> {
 
     private var actorID: ActorID
-
-    // MARK: - Properties
-
-    private(set) var currentClock: VectorClock<ActorID>
+    private var currentClock: VectorClock<ActorID>
 
     // MARK: - Lifecycle
 
@@ -103,7 +99,7 @@ private struct ClockProvider<ActorID: Comparable & Hashable & Codable> {
         return self.currentClock
     }
 
-    mutating func merge(_ clock: VectorClock<ActorID>) {
-        self.currentClock = self.currentClock.merging(clock)
+    mutating func merge(_ clockProvider: ClockProvider<ActorID>) {
+        self.currentClock = self.currentClock.merging(clockProvider.currentClock)
     }
 }
