@@ -22,7 +22,7 @@ public protocol Snapshot {
 /// Holds a vector clock sorted array of operations
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
-    struct OperationContainer {
+    public struct OperationContainer {
         let actor: ActorID
         let clock: VectorClock<ActorID>
         let operation: Operation
@@ -55,13 +55,19 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
-        self.clockProvider.merge(operationLog.clockProvider)
-        let allOperations = Set(operationLog.operations + self.operations)
-        self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
+        self.insert(operationLog.operations)
     }
 
     public func reduce(into snapshot: Operation.SnapshotType) -> Operation.SnapshotType {
         return self.operations.reduce(snapshot, { $1.operation.apply(to: $0) } )
+    }
+
+    public mutating func insert(_ operations: [OperationContainer]) {
+        guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
+
+        self.clockProvider.merge(maxClock)
+        let allOperations = Set(operations + self.operations)
+        self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
     }
 }
 
@@ -69,11 +75,11 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
 
 extension OperationLog.OperationContainer: Equatable, Hashable {
 
-    static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
+    public static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
         return lhs.clock == rhs.clock
     }
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(self.clock)
     }
 }
@@ -101,5 +107,9 @@ private struct ClockProvider<ActorID: Comparable & Hashable & Codable> {
 
     mutating func merge(_ clockProvider: ClockProvider<ActorID>) {
         self.currentClock = self.currentClock.merging(clockProvider.currentClock)
+    }
+
+    mutating func merge(_ clock: VectorClock<ActorID>) {
+        self.currentClock = self.currentClock.merging(clock)
     }
 }
