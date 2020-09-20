@@ -29,17 +29,18 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     private var operations: [OperationContainer] = []
+    private var clockProvider: ClockProvider<ActorID>
 
     // MARK: - Properties
 
     let actorID: ActorID
-    private(set) var currentClock: VectorClock<ActorID>
+    var currentClock: VectorClock<ActorID> { return self.clockProvider.currentClock }
 
     // MARK: - Lifecycle
 
     init(actorID: ActorID) {
         self.actorID = actorID
-        self.currentClock = VectorClock(actorID: self.actorID)
+        self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
     }
 
     // MARK: - OperationLog
@@ -49,12 +50,13 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
     }
 
     public mutating func append(_ operation: Operation) {
-        self.currentClock = self.currentClock.incrementing(self.actorID)
-        self.operations.append(.init(actor: self.actorID, clock: self.currentClock, operation: operation))
+        self.operations.append(.init(actor: self.actorID,
+                                     clock: self.clockProvider.next(),
+                                     operation: operation))
     }
 
     public mutating func merge(_ operationLog: OperationLog) {
-        self.currentClock = self.currentClock.merging(operationLog.currentClock)
+        self.clockProvider.merge(operationLog.currentClock)
         let allOperations = Set(operationLog.operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
     }
@@ -74,5 +76,34 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(self.clock)
+    }
+}
+
+// MARK: - ClockProvider
+
+private struct ClockProvider<ActorID: Comparable & Hashable & Codable> {
+
+    private var actorID: ActorID
+
+    // MARK: - Properties
+
+    private(set) var currentClock: VectorClock<ActorID>
+
+    // MARK: - Lifecycle
+
+    init(actorID: ActorID, vectorClock: VectorClock<ActorID>) {
+        self.currentClock = vectorClock
+        self.actorID = actorID
+    }
+
+    // MARK: - ClockProvider
+
+    mutating func next() -> VectorClock<ActorID> {
+        self.currentClock = self.currentClock.incrementing(self.actorID)
+        return self.currentClock
+    }
+
+    mutating func merge(_ clock: VectorClock<ActorID>) {
+        self.currentClock = self.currentClock.merging(clock)
     }
 }
