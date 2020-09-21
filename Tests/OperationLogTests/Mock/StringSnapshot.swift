@@ -34,6 +34,10 @@ struct StringSnapshot: Snapshot {
     func serialize() throws -> Data {
         return try JSONEncoder().encode(self)
     }
+
+    static func deserialize(fromData data: Data) throws -> StringSnapshot {
+        return try JSONDecoder().decode(self, from: data)
+    }
 }
 
 // MARK: - Codable

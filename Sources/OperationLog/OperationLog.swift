@@ -2,8 +2,14 @@ import Foundation
 import VectorClock
 
 
+/// Transformable to Data
+public protocol Serializable {
+    func serialize() throws -> Data
+    static func deserialize(fromData data: Data) throws -> Self
+}
+
 /// Operation which can be stored in the log
-public protocol LogOperation {
+public protocol LogOperation: Serializable {
     associatedtype SnapshotType: Snapshot
 
     var description: String? { get }
@@ -14,8 +20,7 @@ public protocol LogOperation {
 }
 
 /// Reduced form of n operations at a given point in time
-public protocol Snapshot {
-    func serialize() throws -> Data
+public protocol Snapshot: Serializable {
 }
 
 
