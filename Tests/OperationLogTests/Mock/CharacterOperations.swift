@@ -39,10 +39,6 @@ struct CharacterOperation: LogOperation {
         }
     }
 
-    func serialize() throws -> Data {
-        return try JSONEncoder().encode(self)
-    }
-
     func reverted() -> Self {
         switch self.kind {
         case .append:
@@ -51,6 +47,15 @@ struct CharacterOperation: LogOperation {
             return .init(kind: .append, character: self.character)
         }
     }
+
+    func serialize() throws -> Data {
+        return try JSONEncoder().encode(self)
+    }
+
+    static func deserialize(fromData data: Data) throws -> CharacterOperation {
+        return try JSONDecoder().decode(self, from: data)
+    }
+
 }
 
 // MARK: - Codable

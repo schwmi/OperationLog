@@ -4,13 +4,13 @@ import VectorClock
 
 /// Operation which can be stored in the log
 public protocol LogOperation {
-
     associatedtype SnapshotType: Snapshot
 
     var description: String? { get }
     func apply(to snapshot: SnapshotType) -> SnapshotType
-    func serialize() throws -> Data
     func reverted() -> Self
+    func serialize() throws -> Data
+    static func deserialize(fromData data: Data) throws -> Self
 }
 
 /// Reduced form of n operations at a given point in time
