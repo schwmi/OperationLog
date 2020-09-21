@@ -20,18 +20,24 @@ public protocol LogOperation: Serializable {
 }
 
 /// Reduced form of n operations at a given point in time
-public protocol Snapshot: Serializable {
-}
+public protocol Snapshot: Serializable { }
 
 
 /// Holds a vector clock sorted array of operations
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
     public struct OperationContainer {
-        let id: UUID = UUID()
+        let id: UUID
         let actor: ActorID
         let clock: VectorClock<ActorID>
         let operation: Operation
+
+        init(id: UUID = UUID(), actor: ActorID, clock: VectorClock<ActorID>, operation: Operation) {
+            self.id = id
+            self.actor = actor
+            self.clock = clock
+            self.operation = operation
+        }
     }
 
     private var operations: [OperationContainer] = []
@@ -74,6 +80,38 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
         self.clockProvider.merge(maxClock)
         let allOperations = Set(operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
+    }
+}
+
+// MARK: OperationContainer: Codable
+
+extension OperationLog.OperationContainer: Codable {
+
+    enum CodingKeys: String, CodingKey {
+        case uuid
+        case actor
+        case clock
+        case operation
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let uuid = try container.decode(UUID.self, forKey: .uuid)
+        let actor = try container.decode(ActorID.self, forKey: .actor)
+        let clock = try container.decode(VectorClock<ActorID>.self, forKey: .clock)
+        let operationData = try container.decode(Data.self, forKey: .operation)
+        let operation = try Operation.deserialize(fromData: operationData)
+
+        self.init(id: uuid, actor: actor, clock: clock, operation: operation)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.id, forKey: .uuid)
+        try container.encode(self.actor, forKey: .actor)
+        try container.encode(self.clock, forKey: .clock)
+        let operationData = try self.operation.serialize()
+        try container.encode(operationData, forKey: .operation)
     }
 }
 

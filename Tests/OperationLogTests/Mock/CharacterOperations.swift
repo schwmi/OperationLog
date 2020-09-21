@@ -55,7 +55,6 @@ struct CharacterOperation: LogOperation {
     static func deserialize(fromData data: Data) throws -> CharacterOperation {
         return try JSONDecoder().decode(self, from: data)
     }
-
 }
 
 // MARK: - Codable
