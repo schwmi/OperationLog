@@ -23,6 +23,7 @@ public protocol Snapshot {
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
 
     public struct OperationContainer {
+        let id: UUID = UUID()
         let actor: ActorID
         let clock: VectorClock<ActorID>
         let operation: Operation
