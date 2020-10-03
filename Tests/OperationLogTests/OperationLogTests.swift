@@ -6,17 +6,15 @@ import VectorClock
 final class OperationLogTests: XCTestCase {
 
     func testAddingOperation() {
-        var log = OperationLog<String, StringSnapshot>(actorID: "A")
+        var log = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: "Result: "))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
-        let snapshot = StringSnapshot(string: "Result: ")
-        let result = log.reduce(into: snapshot)
-        XCTAssertEqual(result.string, "Result: ABC")
+        XCTAssertEqual(log.snapshot.string, "Result: ABC")
     }
 
     func testLogDescription() {
-        var log = OperationLog<String, StringSnapshot>(actorID: "A")
+        var log = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: ""))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .removeLast, character: "C"))
@@ -24,8 +22,8 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testLogMerging() {
-        var logA = OperationLog<String, StringSnapshot>(actorID: "A")
-        var logB = OperationLog<String, StringSnapshot>(actorID: "B")
+        var logA = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: ""))
+        var logB = OperationLog<String, StringSnapshot>(actorID: "B", initialSnapshot: .init(string: ""))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))
@@ -41,9 +39,7 @@ final class OperationLogTests: XCTestCase {
         logB.append(.init(kind: .append, character: "B"))
         logA.merge(logB)
         logB.merge(logA)
-        let resultA = logA.reduce(into: .init(string: ""))
-        let resultB = logB.reduce(into: .init(string: ""))
-        XCTAssertEqual(resultA.string, resultB.string)
-        XCTAssertEqual(resultA.string, "AAABAAABBB")
+        XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)
+        XCTAssertEqual(logA.snapshot.string, "AAABAAABBB")
     }
 }

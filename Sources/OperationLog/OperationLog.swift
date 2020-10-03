@@ -44,16 +44,22 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     private var operations: [OperationContainer] = []
     private var clockProvider: ClockProvider<ActorID>
+    private var initialSnapshot: LogSnapshot
 
     // MARK: - Properties
 
     let actorID: ActorID
+    var snapshot: LogSnapshot {
+        // TODO: Cache, make more efficient
+        self.operations.reduce(self.initialSnapshot, { $0.applying($1.operation).snapshot } )
+    }
 
     // MARK: - Lifecycle
 
-    init(actorID: ActorID) {
+    init(actorID: ActorID, initialSnapshot: LogSnapshot) {
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
+        self.initialSnapshot = initialSnapshot
     }
 
     // MARK: - OperationLog
@@ -62,21 +68,18 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         return self.operations.suffix(limit).map { $0.operation.description ?? " - no description - " }
     }
 
+    public mutating func merge(_ operationLog: OperationLog) {
+        self.insert(operationLog.operations)
+    }
+
     public mutating func append(_ operation: Operation) {
         self.operations.append(.init(actor: self.actorID,
                                      clock: self.clockProvider.next(),
                                      operation: operation))
     }
 
-    public mutating func merge(_ operationLog: OperationLog) {
-        self.insert(operationLog.operations)
-    }
-
-    public func reduce(into snapshot: LogSnapshot) -> LogSnapshot {
-        return self.operations.reduce(snapshot, { $0.applying($1.operation).snapshot } )
-    }
-
     public mutating func insert(_ operations: [OperationContainer]) {
+        // TODO: make more efficient
         guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
 
         self.clockProvider.merge(maxClock)
