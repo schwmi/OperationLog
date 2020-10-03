@@ -17,8 +17,8 @@ final class OperationLogTests: XCTestCase {
         var log = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: ""))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
-        log.append(.init(kind: .removeLast, character: "C"))
-        XCTAssertEqual(log.logDescriptions(limit: 2), ["Append character: B", "removeLast character: C"])
+        log.append(.init(kind: .removeLast, character: "B"))
+        XCTAssertEqual(log.logDescriptions(limit: 2), ["Append character: B", "removeLast character: B"])
     }
 
     func testLogMerging() {
@@ -41,5 +41,25 @@ final class OperationLogTests: XCTestCase {
         logB.merge(logA)
         XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)
         XCTAssertEqual(logA.snapshot.string, "AAABAAABBB")
+    }
+
+    func testUndoRedo() {
+        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        log.append(.init(kind: .append, character: "A"))
+        log.append(.init(kind: .append, character: "B"))
+        XCTAssertEqual(log.snapshot.string, "AB")
+        log.undo()
+        XCTAssertEqual(log.snapshot.string, "A")
+        log.redo()
+        XCTAssertEqual(log.snapshot.string, "AB")
+        log.undo()
+        log.undo()
+        log.undo() // no-op (undo queue should be empty)
+        XCTAssertEqual(log.snapshot.string, "")
+        log.redo()
+        log.redo()
+        log.redo() // no-op (redo queue should be empty)
+        XCTAssertEqual(log.snapshot.string, "AB")
+        XCTAssertEqual(log.logDescriptions(limit: .max).count, 8)
     }
 }
