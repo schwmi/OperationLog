@@ -92,6 +92,13 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         let reverseOperation = self.appendOperationToSnapshot(self.undoStack.removeLast())
         self.redoStack.append(reverseOperation)
     }
+
+    public mutating func redo() {
+        guard self.redoStack.isEmpty == false else { return }
+
+        let reverseOperation = self.appendOperationToSnapshot(self.redoStack.removeLast())
+        self.undoStack.append(reverseOperation)
+    }
 }
 
 // MARK: OperationContainer: Codable
