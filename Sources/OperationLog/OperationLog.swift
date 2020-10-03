@@ -20,6 +20,7 @@ public protocol Snapshot: Serializable {
     associatedtype Operation: LogOperation
 
     func applying(_ operation: Operation) -> (snapshot: Self, undoOperation: Operation)
+    mutating func apply(_ operation: Operation) -> Operation
 }
 
 
@@ -42,6 +43,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         }
     }
 
+    private var redoStack: [Operation] = []
+    private var undoStack: [Operation] = []
     private var operations: [OperationContainer] = []
     private var clockProvider: ClockProvider<ActorID>
     private var initialSnapshot: LogSnapshot
@@ -79,7 +82,6 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     }
 
     public mutating func insert(_ operations: [OperationContainer]) {
-        // TODO: make more efficient
         guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
 
         self.clockProvider.merge(maxClock)
@@ -131,6 +133,12 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.clock)
     }
+}
+
+// MARK: - Private
+
+private extension OperationLog {
+
 }
 
 // MARK: - ClockProvider

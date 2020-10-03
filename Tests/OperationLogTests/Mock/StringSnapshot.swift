@@ -13,6 +13,10 @@ struct StringSnapshot: Snapshot {
 
     private(set) var string: String
 
+    init(string: String) {
+        self.string = string
+    }
+
     // MARK: - StringSnapshot
 
     func applying(_ operation: CharacterOperation) -> (snapshot: Self, undoOperation: CharacterOperation) {
