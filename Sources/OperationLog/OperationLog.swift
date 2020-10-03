@@ -10,21 +10,23 @@ public protocol Serializable {
 
 /// Operation which can be stored in the log
 public protocol LogOperation: Serializable {
-    associatedtype SnapshotType: Snapshot
-
     var description: String? { get }
-    func apply(to snapshot: SnapshotType) -> SnapshotType
-    func reverted() -> Self
     func serialize() throws -> Data
     static func deserialize(fromData data: Data) throws -> Self
 }
 
 /// Reduced form of n operations at a given point in time
-public protocol Snapshot: Serializable { }
+public protocol Snapshot: Serializable {
+    associatedtype Operation: LogOperation
+
+    func applying(_ operation: Operation) -> (snapshot: Self, undoOperation: Operation)
+}
 
 
 /// Holds a vector clock sorted array of operations
-public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: LogOperation> {
+public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot: Snapshot> {
+
+    public typealias Operation = LogSnapshot.Operation
 
     public struct OperationContainer {
         let id: UUID
@@ -70,8 +72,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, Operation: 
         self.insert(operationLog.operations)
     }
 
-    public func reduce(into snapshot: Operation.SnapshotType) -> Operation.SnapshotType {
-        return self.operations.reduce(snapshot, { $1.operation.apply(to: $0) } )
+    public func reduce(into snapshot: LogSnapshot) -> LogSnapshot {
+        return self.operations.reduce(snapshot, { $0.applying($1.operation).snapshot } )
     }
 
     public mutating func insert(_ operations: [OperationContainer]) {
@@ -100,7 +102,7 @@ extension OperationLog.OperationContainer: Codable {
         let actor = try container.decode(ActorID.self, forKey: .actor)
         let clock = try container.decode(VectorClock<ActorID>.self, forKey: .clock)
         let operationData = try container.decode(Data.self, forKey: .operation)
-        let operation = try Operation.deserialize(fromData: operationData)
+        let operation = try OperationLog.Operation.deserialize(fromData: operationData)
 
         self.init(id: uuid, actor: actor, clock: clock, operation: operation)
     }
@@ -119,7 +121,7 @@ extension OperationLog.OperationContainer: Codable {
 
 extension OperationLog.OperationContainer: Equatable, Hashable {
 
-    public static func == (lhs: OperationLog<ActorID, Operation>.OperationContainer, rhs: OperationLog<ActorID, Operation>.OperationContainer) -> Bool {
+    public static func == (lhs: OperationLog<ActorID, LogSnapshot>.OperationContainer, rhs: OperationLog<ActorID, LogSnapshot>.OperationContainer) -> Bool {
         return lhs.clock == rhs.clock
     }
 

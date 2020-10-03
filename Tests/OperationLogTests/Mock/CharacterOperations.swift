@@ -39,15 +39,6 @@ struct CharacterOperation: LogOperation {
         }
     }
 
-    func reverted() -> Self {
-        switch self.kind {
-        case .append:
-            return .init(kind: .removeLast, character: self.character)
-        case .removeLast:
-            return .init(kind: .append, character: self.character)
-        }
-    }
-
     func serialize() throws -> Data {
         return try JSONEncoder().encode(self)
     }

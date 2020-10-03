@@ -6,7 +6,7 @@ import VectorClock
 final class OperationLogTests: XCTestCase {
 
     func testAddingOperation() {
-        var log = OperationLog<String, CharacterOperation>(actorID: "A")
+        var log = OperationLog<String, StringSnapshot>(actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
@@ -16,7 +16,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testLogDescription() {
-        var log = OperationLog<String, CharacterOperation>(actorID: "A")
+        var log = OperationLog<String, StringSnapshot>(actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .removeLast, character: "C"))
@@ -24,8 +24,8 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testLogMerging() {
-        var logA = OperationLog<String, CharacterOperation>(actorID: "A")
-        var logB = OperationLog<String, CharacterOperation>(actorID: "B")
+        var logA = OperationLog<String, StringSnapshot>(actorID: "A")
+        var logB = OperationLog<String, StringSnapshot>(actorID: "B")
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))

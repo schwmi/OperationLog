@@ -15,6 +15,20 @@ struct StringSnapshot: Snapshot {
 
     // MARK: - StringSnapshot
 
+    func applying(_ operation: CharacterOperation) -> (snapshot: Self, undoOperation: CharacterOperation) {
+        switch operation.kind {
+        case .append:
+            let undoOperation = CharacterOperation(kind: .removeLast, character: operation.character)
+            let newSnapshot = self.appending(character: operation.character)
+            return (newSnapshot, undoOperation)
+        case .removeLast:
+            // TODO handle empty
+            let undoOperation = CharacterOperation(kind: .append, character: self.string.last!)
+            let newSnapshot = self.removingLast(character: operation.character)
+            return (newSnapshot, undoOperation)
+        }
+    }
+
     func appending(character: Character) -> StringSnapshot {
         return StringSnapshot(string: self.string.appending("\(character)"))
     }
