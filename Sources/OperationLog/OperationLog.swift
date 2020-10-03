@@ -20,7 +20,6 @@ public protocol Snapshot: Serializable {
     associatedtype Operation: LogOperation
 
     func applying(_ operation: Operation) -> (snapshot: Self, undoOperation: Operation)
-    mutating func apply(_ operation: Operation) -> Operation
 }
 
 
@@ -52,17 +51,14 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     // MARK: - Properties
 
     let actorID: ActorID
-    var snapshot: LogSnapshot {
-        // TODO: Cache, make more efficient
-        self.operations.reduce(self.initialSnapshot, { $0.applying($1.operation).snapshot } )
-    }
-
+    private(set) var snapshot: LogSnapshot
     // MARK: - Lifecycle
 
     init(actorID: ActorID, initialSnapshot: LogSnapshot) {
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
         self.initialSnapshot = initialSnapshot
+        self.snapshot = initialSnapshot
     }
 
     // MARK: - OperationLog
@@ -76,17 +72,25 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     }
 
     public mutating func append(_ operation: Operation) {
-        self.operations.append(.init(actor: self.actorID,
-                                     clock: self.clockProvider.next(),
-                                     operation: operation))
+        let reverseOperation = self.appendOperationToSnapshot(operation)
+        self.undoStack.append(reverseOperation)
     }
 
     public mutating func insert(_ operations: [OperationContainer]) {
         guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
 
         self.clockProvider.merge(maxClock)
+        // Improve for better performance
         let allOperations = Set(operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
+        self.recalculateMostRecentSnapshot()
+    }
+
+    public mutating func undo() {
+        guard self.undoStack.isEmpty == false else { return }
+
+        let reverseOperation = self.appendOperationToSnapshot(self.undoStack.removeLast())
+        self.redoStack.append(reverseOperation)
     }
 }
 
@@ -139,6 +143,26 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
 
 private extension OperationLog {
 
+    mutating func recalculateMostRecentSnapshot() {
+        var currentSnapshot = self.initialSnapshot
+        var undoStack: [Operation] = []
+        for operation in self.operations {
+            let (snapshot, undoOperation) = currentSnapshot.applying(operation.operation)
+            currentSnapshot = snapshot
+            undoStack.append(undoOperation)
+        }
+        self.snapshot = currentSnapshot
+        self.undoStack = undoStack
+    }
+
+    mutating func appendOperationToSnapshot(_ operation: Operation) -> Operation {
+        self.operations.append(.init(actor: self.actorID,
+                                     clock: self.clockProvider.next(),
+                                     operation: operation))
+        let (newSnapshot, reverseOperation) = self.snapshot.applying(operation)
+        self.snapshot = newSnapshot
+        return reverseOperation
+    }
 }
 
 // MARK: - ClockProvider
