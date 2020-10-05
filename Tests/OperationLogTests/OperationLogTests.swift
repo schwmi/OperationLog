@@ -62,4 +62,32 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(log.snapshot.string, "AB")
         XCTAssertEqual(log.logDescriptions(limit: .max).count, 8)
     }
+
+    func testSerialization() throws {
+        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        log.append(.init(kind: .append, character: "A"))
+        log.append(.init(kind: .append, character: "B"))
+        log.append(.init(kind: .append, character: "C"))
+        XCTAssertEqual(log.snapshot.string, "ABC")
+
+        // Encode, decode
+        let data = try JSONEncoder().encode(log)
+        var decodedLog = try JSONDecoder().decode(OperationLog<String, StringSnapshot>.self, from: data)
+        XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
+
+        // Try decoded undo
+        decodedLog.undo()
+        log.undo()
+        XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
+
+        // Try decoded redo
+        decodedLog.redo()
+        log.redo()
+        XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
+
+        // Add elements to both
+        decodedLog.append(.init(kind: .append, character: "X"))
+        log.append(.init(kind: .append, character: "X"))
+        XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
+    }
 }

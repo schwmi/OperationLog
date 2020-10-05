@@ -52,6 +52,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     let actorID: ActorID
     private(set) var snapshot: LogSnapshot
+
     // MARK: - Lifecycle
 
     init(actorID: ActorID, initialSnapshot: LogSnapshot) {
@@ -98,6 +99,39 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
         let reverseOperation = self.appendOperationToSnapshot(self.redoStack.removeLast())
         self.undoStack.append(reverseOperation)
+    }
+}
+
+// MARK: - OperationLog: Codable
+
+extension OperationLog: Codable {
+
+    enum CodingKeys: String, CodingKey {
+        case operations
+        case initialSnapshot
+        case actorID
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let actorID = try container.decode(ActorID.self, forKey: .actorID)
+        let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
+        self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
+        self.snapshot = self.initialSnapshot
+        self.actorID = actorID
+        self.operations = try container.decode([OperationContainer].self, forKey: .operations)
+        let clock = self.operations.last?.clock ?? .init(actorID: actorID)
+        self.clockProvider = ClockProvider(actorID: self.actorID, vectorClock: clock)
+
+        self.recalculateMostRecentSnapshot()
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.operations, forKey: .operations)
+        let initialSnapshotData = try self.initialSnapshot.serialize()
+        try container.encode(initialSnapshotData, forKey: .initialSnapshot)
+        try container.encode(self.actorID, forKey: .actorID)
     }
 }
 
