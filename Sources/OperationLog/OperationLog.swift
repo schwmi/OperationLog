@@ -56,6 +56,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     // MARK: - Lifecycle
 
     init(actorID: ActorID, initialSnapshot: LogSnapshot) {
+        precondition(initialSnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
         self.initialSnapshot = initialSnapshot
