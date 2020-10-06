@@ -71,8 +71,8 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(log.snapshot.string, "ABC")
 
         // Encode, decode
-        let data = try JSONEncoder().encode(log)
-        var decodedLog = try JSONDecoder().decode(OperationLog<String, StringSnapshot>.self, from: data)
+        let data = try log.serialize()
+        var decodedLog = try OperationLog<String, StringSnapshot>(actorID: "A", data: data)
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
 
         // Try decoded undo

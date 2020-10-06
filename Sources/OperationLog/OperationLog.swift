@@ -55,12 +55,24 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     // MARK: - Lifecycle
 
-    init(actorID: ActorID, initialSnapshot: LogSnapshot) {
+    public init(actorID: ActorID, initialSnapshot: LogSnapshot) {
         precondition(initialSnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
         self.initialSnapshot = initialSnapshot
         self.snapshot = initialSnapshot
+    }
+
+    public init(actorID: ActorID, data: Data) throws {
+        let container = try JSONDecoder().decode(Container.self, from: data)
+        self.actorID = actorID
+        let clock = container.operations.last?.clock ?? .init(actorID: actorID)
+        self.clockProvider = .init(actorID: actorID, vectorClock: clock)
+        self.operations = container.operations
+        self.initialSnapshot = container.initialSnapshot
+        self.snapshot = container.initialSnapshot
+
+        self.recalculateMostRecentSnapshot()
     }
 
     // MARK: - OperationLog
@@ -101,38 +113,45 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         let reverseOperation = self.appendOperationToSnapshot(self.redoStack.removeLast())
         self.undoStack.append(reverseOperation)
     }
+
+    public func serialize() throws -> Data {
+        let container = Container(initialSnapshot: self.initialSnapshot, operations: self.operations)
+        return try JSONEncoder().encode(container)
+    }
 }
 
-// MARK: - OperationLog: Codable
+// MARK: - OperationLog: Serialization
 
-extension OperationLog: Codable {
+extension OperationLog {
 
-    enum CodingKeys: String, CodingKey {
-        case operations
-        case initialSnapshot
-        case actorID
-    }
+    private struct Container: Codable {
 
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let actorID = try container.decode(ActorID.self, forKey: .actorID)
-        let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
-        self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
-        self.snapshot = self.initialSnapshot
-        self.actorID = actorID
-        self.operations = try container.decode([OperationContainer].self, forKey: .operations)
-        let clock = self.operations.last?.clock ?? .init(actorID: actorID)
-        self.clockProvider = ClockProvider(actorID: self.actorID, vectorClock: clock)
+        let initialSnapshot: LogSnapshot
+        let operations: [OperationContainer]
 
-        self.recalculateMostRecentSnapshot()
-    }
+        enum CodingKeys: String, CodingKey {
+            case operations
+            case initialSnapshot
+        }
 
-    public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(self.operations, forKey: .operations)
-        let initialSnapshotData = try self.initialSnapshot.serialize()
-        try container.encode(initialSnapshotData, forKey: .initialSnapshot)
-        try container.encode(self.actorID, forKey: .actorID)
+        init(initialSnapshot: LogSnapshot, operations: [OperationContainer]) {
+            self.initialSnapshot = initialSnapshot
+            self.operations = operations
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
+            self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
+            self.operations = try container.decode([OperationContainer].self, forKey: .operations)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(self.operations, forKey: .operations)
+            let snapshotData = try self.initialSnapshot.serialize()
+            try container.encode(snapshotData, forKey: .initialSnapshot)
+        }
     }
 }
 
