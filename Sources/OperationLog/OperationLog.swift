@@ -50,8 +50,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     // MARK: - Properties
 
-    let actorID: ActorID
-    private(set) var snapshot: LogSnapshot
+    public let actorID: ActorID
+    public private(set) var snapshot: LogSnapshot
 
     // MARK: - Lifecycle
 
