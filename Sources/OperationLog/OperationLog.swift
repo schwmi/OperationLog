@@ -42,6 +42,11 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         }
     }
 
+    public struct SkippedOperation {
+        let operation: OperationContainer
+        let reason: Error
+    }
+
     private var redoStack: [Operation] = []
     private var undoStack: [Operation] = []
     private var operations: [OperationContainer] = []
@@ -52,7 +57,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     public let actorID: ActorID
     public private(set) var snapshot: LogSnapshot
-    public private(set) var skippedOperations: Set<OperationContainer> = []
+    public private(set) var skippedOperations: Set<SkippedOperation> = []
 
     // MARK: - Lifecycle
 
@@ -191,6 +196,19 @@ extension OperationLog.OperationContainer: Codable {
     }
 }
 
+// MARK: SkippedOperation: Hashable, Equatable
+
+extension OperationLog.SkippedOperation: Equatable, Hashable {
+
+    public static func == (lhs: OperationLog<ActorID, LogSnapshot>.SkippedOperation, rhs: OperationLog<ActorID, LogSnapshot>.SkippedOperation) -> Bool {
+        return lhs.operation == rhs.operation
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(self.operation)
+    }
+}
+
 // MARK: OperationContainer: Hashable, Equatable
 
 extension OperationLog.OperationContainer: Equatable, Hashable {
@@ -218,7 +236,7 @@ private extension OperationLog {
                 currentSnapshot = snapshot
                 undoStack.append(undoOperation)
             } catch {
-                self.skippedOperations.insert(operation)
+                self.skippedOperations.insert(.init(operation: operation, reason: error))
             }
         }
         self.snapshot = currentSnapshot
@@ -235,7 +253,7 @@ private extension OperationLog {
             self.snapshot = newSnapshot
             return reverseOperation
         } catch {
-            self.skippedOperations.insert(operationContainer)
+            self.skippedOperations.insert(.init(operation: operationContainer, reason: error))
             return nil
         }
     }
