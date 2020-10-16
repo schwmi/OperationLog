@@ -52,6 +52,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     public let actorID: ActorID
     public private(set) var snapshot: LogSnapshot
+    public private(set) var skippedOperations: Set<OperationContainer> = []
 
     // MARK: - Lifecycle
 
@@ -86,8 +87,9 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     }
 
     public mutating func append(_ operation: Operation) throws {
-        let reverseOperation = try self.appendOperationToSnapshot(operation)
-        self.undoStack.append(reverseOperation)
+        if let reverseOperation = try self.appendOperationToSnapshot(operation) {
+            self.undoStack.append(reverseOperation)
+        }
     }
 
     public mutating func insert(_ operations: [OperationContainer]) throws {
@@ -103,15 +105,17 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     public mutating func undo() throws {
         guard self.undoStack.isEmpty == false else { return }
 
-        let reverseOperation = try self.appendOperationToSnapshot(self.undoStack.removeLast())
-        self.redoStack.append(reverseOperation)
+        if let reverseOperation = try self.appendOperationToSnapshot(self.undoStack.removeLast()) {
+            self.redoStack.append(reverseOperation)
+        }
     }
 
     public mutating func redo() throws {
         guard self.redoStack.isEmpty == false else { return }
 
-        let reverseOperation = try self.appendOperationToSnapshot(self.redoStack.removeLast())
-        self.undoStack.append(reverseOperation)
+        if let reverseOperation = try self.appendOperationToSnapshot(self.redoStack.removeLast()) {
+            self.undoStack.append(reverseOperation)
+        }
     }
 
     public func serialize() throws -> Data {
@@ -207,22 +211,33 @@ private extension OperationLog {
     mutating func recalculateMostRecentSnapshot() throws {
         var currentSnapshot = self.initialSnapshot
         var undoStack: [Operation] = []
+        self.skippedOperations = []
         for operation in self.operations {
-            let (snapshot, undoOperation) = try currentSnapshot.applying(operation.operation)
-            currentSnapshot = snapshot
-            undoStack.append(undoOperation)
+            do {
+                let (snapshot, undoOperation) = try currentSnapshot.applying(operation.operation)
+                currentSnapshot = snapshot
+                undoStack.append(undoOperation)
+            } catch {
+                self.skippedOperations.insert(operation)
+            }
         }
         self.snapshot = currentSnapshot
         self.undoStack = undoStack
     }
 
-    mutating func appendOperationToSnapshot(_ operation: Operation) throws -> Operation {
-        self.operations.append(.init(actor: self.actorID,
-                                     clock: self.clockProvider.next(),
-                                     operation: operation))
-        let (newSnapshot, reverseOperation) = try self.snapshot.applying(operation)
-        self.snapshot = newSnapshot
-        return reverseOperation
+    mutating func appendOperationToSnapshot(_ operation: Operation) throws -> Operation? {
+        let operationContainer: OperationContainer = .init(actor: self.actorID,
+                                                           clock: self.clockProvider.next(),
+                                                           operation: operation)
+        self.operations.append(operationContainer)
+        do {
+            let (newSnapshot, reverseOperation) = try self.snapshot.applying(operation)
+            self.snapshot = newSnapshot
+            return reverseOperation
+        } catch {
+            self.skippedOperations.insert(operationContainer)
+            return nil
+        }
     }
 }
 
