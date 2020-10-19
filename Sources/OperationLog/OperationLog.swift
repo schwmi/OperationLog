@@ -52,12 +52,14 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     private var operations: [OperationContainer] = []
     private var clockProvider: ClockProvider<ActorID>
     private var initialSnapshot: LogSnapshot
+    private var initialSummary: Summary
 
     // MARK: - Properties
 
     public let actorID: ActorID
     public private(set) var snapshot: LogSnapshot
     public private(set) var skippedOperations: Set<SkippedOperation> = []
+    public private(set) var summary: Summary
 
     // MARK: - Lifecycle
 
@@ -67,6 +69,12 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
         self.initialSnapshot = initialSnapshot
         self.snapshot = initialSnapshot
+        let summary: Summary = .init(actors: [actorID],
+                                     latestClock: .init(actorID: actorID),
+                                     operationCount: 0,
+                                     operationIDs: [])
+        self.initialSummary = summary
+        self.summary = summary
     }
 
     public init(actorID: ActorID, data: Data) throws {
@@ -77,6 +85,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         self.operations = container.operations
         self.initialSnapshot = container.initialSnapshot
         self.snapshot = container.initialSnapshot
+        self.initialSummary = container.summary
+        self.summary = container.summary
 
         try self.recalculateMostRecentSnapshot()
     }
@@ -124,7 +134,9 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     }
 
     public func serialize() throws -> Data {
-        let container = Container(initialSnapshot: self.initialSnapshot, operations: self.operations)
+        let container = Container(initialSnapshot: self.initialSnapshot,
+                                  operations: self.operations,
+                                  summary: self.summary)
         return try JSONEncoder().encode(container)
     }
 }
@@ -136,21 +148,25 @@ extension OperationLog {
     private struct Container: Codable {
 
         let initialSnapshot: LogSnapshot
+        let summary: Summary
         let operations: [OperationContainer]
 
         enum CodingKeys: String, CodingKey {
             case operations
             case initialSnapshot
+            case summary
         }
 
-        init(initialSnapshot: LogSnapshot, operations: [OperationContainer]) {
+        init(initialSnapshot: LogSnapshot, operations: [OperationContainer], summary: Summary) {
             self.initialSnapshot = initialSnapshot
             self.operations = operations
+            self.summary = summary
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
+            self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
             self.operations = try container.decode([OperationContainer].self, forKey: .operations)
         }
@@ -158,6 +174,7 @@ extension OperationLog {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(self.operations, forKey: .operations)
+            try container.encode(self.summary, forKey: .summary)
             let snapshotData = try self.initialSnapshot.serialize()
             try container.encode(snapshotData, forKey: .initialSnapshot)
         }
@@ -228,17 +245,20 @@ private extension OperationLog {
 
     mutating func recalculateMostRecentSnapshot() throws {
         var currentSnapshot = self.initialSnapshot
+        var currentSummary = self.initialSummary
         var undoStack: [Operation] = []
         self.skippedOperations = []
         for operation in self.operations {
             do {
                 let (snapshot, undoOperation) = try currentSnapshot.applying(operation.operation)
                 currentSnapshot = snapshot
+                currentSummary.apply(operation)
                 undoStack.append(undoOperation)
             } catch {
                 self.skippedOperations.insert(.init(operation: operation, reason: error))
             }
         }
+        self.summary = currentSummary
         self.snapshot = currentSnapshot
         self.undoStack = undoStack
     }
@@ -251,6 +271,7 @@ private extension OperationLog {
         do {
             let (newSnapshot, reverseOperation) = try self.snapshot.applying(operation)
             self.snapshot = newSnapshot
+            self.summary.apply(operationContainer)
             return reverseOperation
         } catch {
             self.skippedOperations.insert(.init(operation: operationContainer, reason: error))
