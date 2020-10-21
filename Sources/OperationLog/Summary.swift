@@ -17,14 +17,15 @@ public extension OperationLog {
 
             let id: UUID
             let index: Int
+            let actor: ActorID
             let applyType: ApplyType
         }
-
+        
         public var actors: Set<ActorID>
         public var latestClock: VectorClock<ActorID>
         public var operationCount: Int
         public var operationIDs: [AppliedOperation]
-
+        
         mutating func apply(_ operation: OperationContainer, outcome: Outcome<Operation>) {
             self.actors.insert(operation.actor)
             self.latestClock = operation.clock
@@ -39,7 +40,10 @@ public extension OperationLog {
                     return .skipped(reason: reason)
                 }
             }()
-            self.operationIDs.append(.init(id: operation.id, index: self.operationCount, applyType: applyType))
+            self.operationIDs.append(.init(id: operation.id,
+                                           index: self.operationCount,
+                                           actor: operation.actor,
+                                           applyType: applyType))
         }
     }
 }
