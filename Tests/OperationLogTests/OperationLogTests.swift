@@ -48,17 +48,17 @@ final class OperationLogTests: XCTestCase {
         try log.append(.init(kind: .append, character: "A"))
         try log.append(.init(kind: .append, character: "B"))
         XCTAssertEqual(log.snapshot.string, "AB")
-        try log.undo()
+        log.undo()
         XCTAssertEqual(log.snapshot.string, "A")
-        try log.redo()
+        log.redo()
         XCTAssertEqual(log.snapshot.string, "AB")
-        try log.undo()
-        try log.undo()
-        try log.undo() // no-op (undo queue should be empty)
+        log.undo()
+        log.undo()
+        log.undo() // no-op (undo queue should be empty)
         XCTAssertEqual(log.snapshot.string, "")
-        try log.redo()
-        try log.redo()
-        try log.redo() // no-op (redo queue should be empty)
+        log.redo()
+        log.redo()
+        log.redo() // no-op (redo queue should be empty)
         XCTAssertEqual(log.snapshot.string, "AB")
         XCTAssertEqual(log.logDescriptions(limit: .max).count, 8)
     }
@@ -76,13 +76,13 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
 
         // Try decoded undo
-        try decodedLog.undo()
-        try log.undo()
+        decodedLog.undo()
+        log.undo()
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
 
         // Try decoded redo
-        try decodedLog.redo()
-        try log.redo()
+        decodedLog.redo()
+        log.redo()
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
 
         // Add elements to both

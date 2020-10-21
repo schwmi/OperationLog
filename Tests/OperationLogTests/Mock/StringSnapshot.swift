@@ -19,17 +19,20 @@ struct StringSnapshot: Snapshot {
 
     // MARK: - StringSnapshot
 
-    func applying(_ operation: CharacterOperation) -> (snapshot: Self, undoOperation: CharacterOperation) {
+    func applying(_ operation: CharacterOperation) -> (snapshot: StringSnapshot, outcome: Outcome<CharacterOperation>) {
         switch operation.kind {
         case .append:
             let undoOperation = CharacterOperation(kind: .removeLast, character: operation.character)
             let newSnapshot = self.appending(character: operation.character)
-            return (newSnapshot, undoOperation)
+            return (newSnapshot, .fullApplied(undoOperation: undoOperation))
         case .removeLast:
-            // TODO handle empty
+            guard self.string.isEmpty == false else {
+                return (self, .skipped(reason: "Snapshot is empty"))
+            }
+
             let undoOperation = CharacterOperation(kind: .append, character: self.string.last!)
             let newSnapshot = self.removingLast(character: operation.character)
-            return (newSnapshot, undoOperation)
+            return (newSnapshot, .fullApplied(undoOperation: undoOperation))
         }
     }
 
