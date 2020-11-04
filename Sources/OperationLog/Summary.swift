@@ -13,12 +13,21 @@ public extension OperationLog {
                 case fullApplied
                 case partialApplied(reason: String)
                 case skipped(reason: String)
+
+                public var isSkipped: Bool {
+                    switch self {
+                    case .skipped:
+                        return true
+                    case .partialApplied, .fullApplied:
+                        return false
+                    }
+                }
             }
 
-            let id: UUID
-            let index: Int
-            let actor: ActorID
-            let applyType: ApplyType
+            public let id: UUID
+            public let index: Int
+            public let actor: ActorID
+            public let applyType: ApplyType
         }
         
         public var actors: Set<ActorID>
