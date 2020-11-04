@@ -48,11 +48,6 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         }
     }
 
-    public struct SkippedOperation {
-        let operation: OperationContainer
-        let reason: Error
-    }
-
     private var redoStack: [Operation] = []
     private var undoStack: [Operation] = []
     private var operations: [OperationContainer] = []
@@ -64,7 +59,6 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     public let actorID: ActorID
     public private(set) var snapshot: LogSnapshot
-    public private(set) var skippedOperations: Set<SkippedOperation> = []
     public private(set) var summary: Summary
 
     // MARK: - Lifecycle
@@ -216,19 +210,6 @@ extension OperationLog.OperationContainer: Codable {
         try container.encode(self.clock, forKey: .clock)
         let operationData = try self.operation.serialize()
         try container.encode(operationData, forKey: .operation)
-    }
-}
-
-// MARK: SkippedOperation: Hashable, Equatable
-
-extension OperationLog.SkippedOperation: Equatable, Hashable {
-
-    public static func == (lhs: OperationLog<ActorID, LogSnapshot>.SkippedOperation, rhs: OperationLog<ActorID, LogSnapshot>.SkippedOperation) -> Bool {
-        return lhs.operation == rhs.operation
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(self.operation)
     }
 }
 
