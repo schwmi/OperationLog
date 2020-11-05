@@ -10,11 +10,9 @@ let package = Package(
     products: [
         .library(name: "OperationLog", targets: ["OperationLog"]),
     ],
-    dependencies: [
-        .package(url: "git@github.com:schwmi/VectorClock.git", from: "1.0.0")
-    ],
+    dependencies: [ ],
     targets: [
-        .target(name: "OperationLog", dependencies: ["VectorClock"]),
+        .target(name: "OperationLog", dependencies: []),
         .testTarget(name: "OperationLogTests", dependencies: ["OperationLog"]),
     ]
 )

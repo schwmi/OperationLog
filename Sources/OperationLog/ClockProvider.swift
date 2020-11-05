@@ -1,5 +1,4 @@
 import Foundation
-import VectorClock
 
 
 /// Encapsulates logic to create vector clock timestamps for total operation ordering

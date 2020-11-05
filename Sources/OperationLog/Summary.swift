@@ -1,5 +1,4 @@
 import Foundation
-import VectorClock
 
 
 public extension OperationLog {

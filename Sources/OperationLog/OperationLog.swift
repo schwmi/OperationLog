@@ -1,5 +1,4 @@
 import Foundation
-import VectorClock
 
 
 /// Transformable to Data
