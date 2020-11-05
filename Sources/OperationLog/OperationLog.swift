@@ -21,14 +21,18 @@ public protocol Snapshot: Serializable {
     func applying(_ operation: Operation) -> (snapshot: Self, outcome: Outcome<Operation>)
 }
 
-/// Possible outcomes after applying an operaton onto a snapshot
+/// Possible outcomes after applying an operation
 public enum Outcome<Operation: LogOperation> {
     case fullApplied(undoOperation: Operation)
     case partialApplied(undoOperation: Operation, reason: String)
     case skipped(reason: String)
 }
 
-/// Holds a vector clock sorted array of operations
+/// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of  all applied operations
+/// Terminology:
+///    - Operation … Used to modify a snapshot
+///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
+///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot: Snapshot> {
 
     public typealias Operation = LogSnapshot.Operation
@@ -56,12 +60,19 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     // MARK: - Properties
 
+    /// ID of the actor which acts on the log - used for generating timestamps
     public let actorID: ActorID
+    /// Current result when applying all operations within the log
     public private(set) var snapshot: LogSnapshot
+    /// Summary information about all applied operations
     public private(set) var summary: Summary
 
     // MARK: - Lifecycle
 
+    /// Initializes a new OperationLog
+    /// - Parameters:
+    ///   - actorID: The actorID which is used for new timestamps when applying new operations
+    ///   - initialSnapshot: The snapshot which identifies the initial state in which successive operations are reduced into
     public init(actorID: ActorID, initialSnapshot: LogSnapshot) {
         precondition(initialSnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
@@ -71,11 +82,16 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
                                      operationCount: 0,
-                                     operationIDs: [])
+                                     operationsInfos: [])
         self.initialSummary = summary
         self.summary = summary
     }
 
+    /// Initializes a OperationLog from a serialized form
+    /// - Parameters:
+    ///   - actorID: The actorID which is used for new timestamps when applying new operations
+    ///   - data: The serialized data of the log
+    /// - Throws: if decoding of data fails
     public init(actorID: ActorID, data: Data) throws {
         let container = try JSONDecoder().decode(Container.self, from: data)
         self.actorID = actorID
@@ -87,7 +103,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         self.initialSummary = container.summary
         self.summary = container.summary
 
-        try self.recalculateMostRecentSnapshot()
+        self.recalculateMostRecentSnapshot()
     }
 
     // MARK: - OperationLog
@@ -96,26 +112,34 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         return self.operations.suffix(limit).map { $0.operation.description ?? " - no description - " }
     }
 
-    public mutating func merge(_ operationLog: OperationLog) throws {
-        try self.insert(operationLog.operations)
+    /// Merge another operation log into the current one
+    /// - Parameter operationLog: The log which should be merged
+    public mutating func merge(_ operationLog: OperationLog) {
+        self.insert(operationLog.operations)
     }
 
-    public mutating func append(_ operation: Operation) throws {
+    /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
+    /// - Parameter operation: The operation which should be added
+    public mutating func append(_ operation: Operation) {
         if let reverseOperation = self.appendOperationToSnapshot(operation) {
             self.undoStack.append(reverseOperation)
         }
     }
 
-    public mutating func insert(_ operations: [OperationContainer]) throws {
+    /// Insert an array of OperationContainers into a log - normally those are operations which where added into another log and are now
+    /// synced to the current log
+    /// - Parameter operations: The operationContainers which should be added
+    public mutating func insert(_ operations: [OperationContainer]) {
         guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
 
         self.clockProvider.merge(maxClock)
         // Improve for better performance
         let allOperations = Set(operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
-        try self.recalculateMostRecentSnapshot()
+        self.recalculateMostRecentSnapshot()
     }
 
+    /// Appends a new operation which undo's the last applied operation
     public mutating func undo() {
         guard self.undoStack.isEmpty == false else { return }
 
@@ -124,6 +148,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         }
     }
 
+    /// Appends a new operation which redo's the last undone operation
     public mutating func redo() {
         guard self.redoStack.isEmpty == false else { return }
 
@@ -132,6 +157,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         }
     }
 
+    /// Creates a data representation of the log which can be stored and later
+    /// used in init(actorID: ActorID, data: Data) for initializing a log
     public func serialize() throws -> Data {
         let container = Container(initialSnapshot: self.initialSnapshot,
                                   operations: self.operations,
@@ -229,7 +256,7 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
 
 private extension OperationLog {
 
-    mutating func recalculateMostRecentSnapshot() throws {
+    mutating func recalculateMostRecentSnapshot() {
         var currentSnapshot = self.initialSnapshot
         var currentSummary = self.initialSummary
         var currentUndoStack: [Operation] = []

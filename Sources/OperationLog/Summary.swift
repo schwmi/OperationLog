@@ -23,16 +23,24 @@ public extension OperationLog {
                 }
             }
 
+            /// ID of the operation
             public let id: UUID
+            /// Index, apply order
             public let index: Int
+            /// ActorID which applied the operation
             public let actor: ActorID
+            /// Information how the operation was applied
             public let applyType: ApplyType
         }
-        
+
+        /// All actorIDs which applied operations in a given log
         public var actors: Set<ActorID>
+        /// The latest clock of the Log => clock of the current snapshot
         public var latestClock: VectorClock<ActorID>
+        /// Number of operations in the log
         public var operationCount: Int
-        public var operationIDs: [AppliedOperation]
+        /// Sorted array (apply order) of operation infos
+        public var operationsInfos: [AppliedOperation]
         
         mutating func apply(_ operation: OperationContainer, outcome: Outcome<Operation>) {
             self.actors.insert(operation.actor)
@@ -48,7 +56,7 @@ public extension OperationLog {
                     return .skipped(reason: reason)
                 }
             }()
-            self.operationIDs.append(.init(id: operation.id,
+            self.operationsInfos.append(.init(id: operation.id,
                                            index: self.operationCount,
                                            actor: operation.actor,
                                            applyType: applyType))
