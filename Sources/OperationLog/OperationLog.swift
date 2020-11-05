@@ -28,7 +28,7 @@ public enum Outcome<Operation: LogOperation> {
     case skipped(reason: String)
 }
 
-/// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of  all applied operations
+/// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
 ///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
