@@ -1,6 +1,8 @@
 import Foundation
 
 
+// MARK: - Protocols
+
 /// Transformable to Data
 public protocol Serializable {
     func serialize() throws -> Data
@@ -21,13 +23,6 @@ public protocol Snapshot: Serializable {
     func applying(_ operation: Operation) -> (snapshot: Self, outcome: Outcome<Operation>)
 }
 
-/// Possible outcomes after applying an operation
-public enum Outcome<Operation: LogOperation> {
-    case fullApplied(undoOperation: Operation)
-    case partialApplied(undoOperation: Operation, reason: String)
-    case skipped(reason: String)
-}
-
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
@@ -37,6 +32,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     public typealias Operation = LogSnapshot.Operation
 
+    /// Wraps operations with timestamp and actor information when applied to the log
     public struct OperationContainer {
         let id: UUID
         let actor: ActorID
@@ -60,9 +56,9 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     // MARK: - Properties
 
-    /// ID of the actor which acts on the log - used for generating timestamps
+    /// ID of the actor which operates on the log instance - used for generating timestamps
     public let actorID: ActorID
-    /// Current result when applying all operations within the log
+    /// Current result when reducing all operations within the log
     public private(set) var snapshot: LogSnapshot
     /// Summary information about all applied operations
     public private(set) var summary: Summary
@@ -82,7 +78,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
                                      operationCount: 0,
-                                     operationsInfos: [])
+                                     operationInfos: [])
         self.initialSummary = summary
         self.summary = summary
     }
@@ -133,7 +129,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
         guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
 
         self.clockProvider.merge(maxClock)
-        // Improve for better performance
+        // This can be improved for better performance
         let allOperations = Set(operations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
         self.recalculateMostRecentSnapshot()
@@ -165,6 +161,15 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
                                   summary: self.summary)
         return try JSONEncoder().encode(container)
     }
+}
+
+// MARK: - Outcome
+
+/// Possible outcomes after applying an operation
+public enum Outcome<Operation: LogOperation> {
+    case fullApplied(undoOperation: Operation)
+    case partialApplied(undoOperation: Operation, reason: String)
+    case skipped(reason: String)
 }
 
 // MARK: - OperationLog: Serialization
@@ -256,6 +261,7 @@ extension OperationLog.OperationContainer: Equatable, Hashable {
 
 private extension OperationLog {
 
+    /// Recalculates the most recent snapshot by applying all operations onto the initial snapshot
     mutating func recalculateMostRecentSnapshot() {
         var currentSnapshot = self.initialSnapshot
         var currentSummary = self.initialSummary
@@ -276,6 +282,7 @@ private extension OperationLog {
         self.undoStack = currentUndoStack
     }
 
+    /// Appends a new operation to the log and applies it to the most recent snapshot
     mutating func appendOperationToSnapshot(_ operation: Operation) -> Operation? {
         let operationContainer: OperationContainer = .init(actor: self.actorID,
                                                            clock: self.clockProvider.next(),

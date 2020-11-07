@@ -103,12 +103,4 @@ final class VectorClockTests: XCTestCase {
         print(increasedClock.description)
         XCTAssertEqual(increasedClock.description, "<A=0, B=1 | t: B(2.00)>")
     }
-
-    static var allTests = [
-        ("testIncrement", testIncrement),
-        ("testComparisonWithConstantTime", testComparisonWithConstantTime),
-        ("testComparisonWithIncreasingTime", testComparisonWithIncreasingTime),
-        ("testMerge", testMerge),
-        ("testNewEmptyClock", testNewEmptyClock)
-    ]
 }

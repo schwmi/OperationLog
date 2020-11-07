@@ -40,7 +40,7 @@ public extension OperationLog {
         /// Number of operations in the log
         public var operationCount: Int
         /// Sorted array (apply order) of operation infos
-        public var operationsInfos: [AppliedOperation]
+        public var operationInfos: [AppliedOperation]
         
         mutating func apply(_ operation: OperationContainer, outcome: Outcome<Operation>) {
             self.actors.insert(operation.actor)
@@ -56,10 +56,10 @@ public extension OperationLog {
                     return .skipped(reason: reason)
                 }
             }()
-            self.operationsInfos.append(.init(id: operation.id,
-                                           index: self.operationCount,
-                                           actor: operation.actor,
-                                           applyType: applyType))
+            self.operationInfos.append(.init(id: operation.id,
+                                             index: self.operationCount,
+                                             actor: operation.actor,
+                                             applyType: applyType))
         }
     }
 }

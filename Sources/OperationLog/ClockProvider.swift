@@ -1,7 +1,7 @@
 import Foundation
 
 
-/// Encapsulates logic to create vector clock timestamps for total operation ordering
+/// Encapsulates logic for creating vector clock timestamps for total operation ordering
 struct ClockProvider<ActorID: Comparable & Hashable & Codable> {
 
     private var actorID: ActorID
