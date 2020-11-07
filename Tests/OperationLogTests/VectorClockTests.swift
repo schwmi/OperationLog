@@ -81,6 +81,21 @@ final class VectorClockTests: XCTestCase {
         XCTAssertTrue(clock1A < clock2B)
     }
 
+    func testCodable() throws {
+        let clock = VectorClock(actorID: "A", timestampProviderStrategy: .monotonicIncrease)
+        let encoded = try JSONEncoder().encode(clock)
+        let decoded = try JSONDecoder().decode(VectorClock<String>.self, from: encoded)
+        XCTAssertEqual(clock, decoded)
+        let increasedClock = decoded.incrementing("B")
+        print(increasedClock.description)
+        XCTAssertEqual(increasedClock.description, "<A=0, B=1 | t: B(2.00)>")
+    }
+}
+
+// MARK: - Performance Tests
+
+extension VectorClockTests {
+
     func testSortingPerformance() {
         var clocks = Set<VectorClock<String>>()
         let actors = ["A", "B", "C", "D"]
@@ -92,15 +107,5 @@ final class VectorClockTests: XCTestCase {
         self.measure {
             _ = clocks.sorted()
         }
-    }
-
-    func testCodable() throws {
-        let clock = VectorClock(actorID: "A", timestampProviderStrategy: .monotonicIncrease)
-        let encoded = try JSONEncoder().encode(clock)
-        let decoded = try JSONDecoder().decode(VectorClock<String>.self, from: encoded)
-        XCTAssertEqual(clock, decoded)
-        let increasedClock = decoded.incrementing("B")
-        print(increasedClock.description)
-        XCTAssertEqual(increasedClock.description, "<A=0, B=1 | t: B(2.00)>")
     }
 }
