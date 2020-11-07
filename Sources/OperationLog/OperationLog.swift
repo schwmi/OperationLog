@@ -49,7 +49,6 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
 
     private var redoStack: [Operation] = []
     private var undoStack: [Operation] = []
-    private var operations: [OperationContainer] = []
     private var clockProvider: ClockProvider<ActorID>
     private var initialSnapshot: LogSnapshot
     private var initialSummary: Summary
@@ -62,6 +61,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     public private(set) var snapshot: LogSnapshot
     /// Summary information about all applied operations
     public private(set) var summary: Summary
+    /// Applied Operations, clock sorted
+    public private(set) var operations: [OperationContainer] = []
 
     // MARK: - Lifecycle
 

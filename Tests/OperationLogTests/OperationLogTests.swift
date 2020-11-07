@@ -90,3 +90,33 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
     }
 }
+
+// MARK: - Performance Tests
+
+extension OperationLogTests {
+
+    func testAddOperationPerformance() {
+        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        self.measure {
+            for _ in 1..<1000 {
+                log.append(.init(kind: .append, character: "A"))
+            }
+        }
+    }
+
+    func testAddAndMergePerformance() {
+        var logA = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var logB = OperationLog(actorID: "B", initialSnapshot: StringSnapshot(string: ""))
+        // Add operations to logA
+        for _ in 1..<100 {
+            logA.append(.init(kind: .append, character: "A"))
+        }
+        // Merge operations one by one into log b
+        self.measure {
+            for operation in logA.operations {
+                logB.insert([operation])
+            }
+        }
+        XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)
+    }
+}
