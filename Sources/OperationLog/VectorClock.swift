@@ -2,7 +2,7 @@ import Foundation
 
 
 /// A Vector clock which ensures a total order by additionally adding a timestamp
-public struct VectorClock<ActorID: Comparable & Hashable & Codable> {
+public struct VectorClock<ActorID: Identifier> {
 
     public enum TimestampProviderStrategy: Int, Codable {
         case unixTime

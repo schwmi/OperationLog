@@ -23,12 +23,14 @@ public protocol Snapshot: Serializable {
     func applying(_ operation: Operation) -> (snapshot: Self, outcome: Outcome<Operation>)
 }
 
+public typealias Identifier = Comparable & Hashable & Codable
+
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
 ///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
-public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot: Snapshot> {
+public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
 
     public typealias Operation = LogSnapshot.Operation
 
