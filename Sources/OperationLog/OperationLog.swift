@@ -30,7 +30,7 @@ public typealias Identifier = Comparable & Hashable & Codable
 ///    - Operation … Used to modify a snapshot
 ///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
-public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
+public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
 
     public typealias Operation = LogSnapshot.Operation
 
@@ -57,6 +57,8 @@ public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
 
     // MARK: - Properties
 
+    /// ID of the operation log
+    public let logID: LogID
     /// ID of the actor which operates on the log instance - used for generating timestamps
     public let actorID: ActorID
     /// Current result when reducing all operations within the log
@@ -74,7 +76,7 @@ public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
     /// - Parameters:
     ///   - actorID: The actorID which is used for new timestamps when applying new operations
     ///   - initialSnapshot: The snapshot which identifies the initial state in which successive operations are reduced into
-    public init(actorID: ActorID, initialSnapshot: LogSnapshot) {
+    public init(logID: LogID, actorID: ActorID, initialSnapshot: LogSnapshot) {
         precondition(initialSnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
@@ -86,6 +88,7 @@ public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
                                      operationInfos: [])
         self.initialSummary = summary
         self.summary = summary
+        self.logID = logID
     }
 
     /// Initializes a OperationLog from a serialized form
@@ -103,6 +106,7 @@ public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
         self.snapshot = container.initialSnapshot
         self.initialSummary = container.summary
         self.summary = container.summary
+        self.logID = container.logID
 
         self.recalculateMostRecentSnapshot()
     }
@@ -161,7 +165,8 @@ public struct OperationLog<ActorID: Identifier, LogSnapshot: Snapshot> {
     /// Creates a data representation of the log which can be stored and later
     /// used in init(actorID: ActorID, data: Data) for initializing a log
     public func serialize() throws -> Data {
-        let container = Container(initialSnapshot: self.initialSnapshot,
+        let container = Container(logID: self.logID,
+                                  initialSnapshot: self.initialSnapshot,
                                   operations: self.operations,
                                   summary: self.initialSummary)
         return try JSONEncoder().encode(container)
@@ -181,8 +186,10 @@ public enum Outcome<Operation: LogOperation> {
 
 extension OperationLog {
 
+    /// Container used for serialization purposes
     private struct Container: Codable {
 
+        let logID: LogID
         let initialSnapshot: LogSnapshot
         let summary: Summary
         let operations: [OperationContainer]
@@ -191,12 +198,14 @@ extension OperationLog {
             case operations
             case initialSnapshot
             case summary
+            case logID
         }
 
-        init(initialSnapshot: LogSnapshot, operations: [OperationContainer], summary: Summary) {
+        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [OperationContainer], summary: Summary) {
             self.initialSnapshot = initialSnapshot
             self.operations = operations
             self.summary = summary
+            self.logID = logID
         }
 
         public init(from decoder: Decoder) throws {
@@ -205,6 +214,7 @@ extension OperationLog {
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
             self.operations = try container.decode([OperationContainer].self, forKey: .operations)
+            self.logID = try container.decode(LogID.self, forKey: .logID)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -213,6 +223,7 @@ extension OperationLog {
             try container.encode(self.summary, forKey: .summary)
             let snapshotData = try self.initialSnapshot.serialize()
             try container.encode(snapshotData, forKey: .initialSnapshot)
+            try container.encode(self.logID, forKey: .logID)
         }
     }
 }
@@ -253,7 +264,7 @@ extension OperationLog.OperationContainer: Codable {
 
 extension OperationLog.OperationContainer: Equatable, Hashable {
 
-    public static func == (lhs: OperationLog<ActorID, LogSnapshot>.OperationContainer, rhs: OperationLog<ActorID, LogSnapshot>.OperationContainer) -> Bool {
+    public static func == (lhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer, rhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer) -> Bool {
         return lhs.clock == rhs.clock
     }
 

@@ -5,8 +5,8 @@ import XCTest
 final class SummaryTests: XCTestCase {
 
     func testSummaryConstruction() throws {
-        var logA = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: "Result: "))
-        var logB = OperationLog<String, StringSnapshot>(actorID: "B", initialSnapshot: .init(string: "Result: "))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
+        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: .init(string: "Result: "))
         logB.append(.init(kind: .append, character: "X"))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
@@ -21,7 +21,7 @@ final class SummaryTests: XCTestCase {
     }
 
     func testPersistence() throws {
-        var logA = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: "Result: "))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
         logA.append(.init(kind: .append, character: "C"))
@@ -29,7 +29,7 @@ final class SummaryTests: XCTestCase {
         XCTAssertEqual(logA.summary.operationCount, 3)
 
         let data = try logA.serialize()
-        let deserializedA = try OperationLog<String, StringSnapshot>(actorID: "A", data: data)
+        let deserializedA = try CharacterOperationLog(actorID: "A", data: data)
         XCTAssertEqual(deserializedA.summary.actors, ["A"])
         XCTAssertEqual(deserializedA.summary.operationCount, 3)
     }

@@ -1,11 +1,12 @@
 import XCTest
 @testable import OperationLog
 
+typealias CharacterOperationLog = OperationLog<String, String, StringSnapshot>
 
 final class OperationLogTests: XCTestCase {
 
     func testAddingOperation() {
-        var log = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: "Result: "))
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
@@ -13,7 +14,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testLogDescription() {
-        var log = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .removeLast, character: "B"))
@@ -21,8 +22,8 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testLogMerging() {
-        var logA = OperationLog<String, StringSnapshot>(actorID: "A", initialSnapshot: .init(string: ""))
-        var logB = OperationLog<String, StringSnapshot>(actorID: "B", initialSnapshot: .init(string: ""))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
+        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: .init(string: ""))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "A"))
@@ -43,7 +44,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testUndoRedo() {
-        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         XCTAssertEqual(log.snapshot.string, "AB")
@@ -63,7 +64,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testSerialization() throws {
-        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
@@ -71,8 +72,9 @@ final class OperationLogTests: XCTestCase {
 
         // Encode, decode
         let data = try log.serialize()
-        var decodedLog = try OperationLog<String, StringSnapshot>(actorID: "A", data: data)
+        var decodedLog = try CharacterOperationLog(actorID: "A", data: data)
         XCTAssertEqual(decodedLog.snapshot.string, log.snapshot.string)
+        XCTAssertEqual(decodedLog.logID, log.logID)
 
         // Try decoded undo
         decodedLog.undo()
@@ -96,7 +98,7 @@ final class OperationLogTests: XCTestCase {
 extension OperationLogTests {
 
     func testAddOperationPerformance() {
-        var log = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
         self.measure {
             for _ in 1..<1000 {
                 log.append(.init(kind: .append, character: "A"))
@@ -105,8 +107,8 @@ extension OperationLogTests {
     }
 
     func testAddAndMergePerformance() {
-        var logA = OperationLog(actorID: "A", initialSnapshot: StringSnapshot(string: ""))
-        var logB = OperationLog(actorID: "B", initialSnapshot: StringSnapshot(string: ""))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: StringSnapshot(string: ""))
         // Add operations to logA
         for _ in 1..<100 {
             logA.append(.init(kind: .append, character: "A"))
