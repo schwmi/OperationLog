@@ -63,6 +63,8 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     public private(set) var summary: Summary
     /// Applied Operations, clock sorted
     public private(set) var operations: [OperationContainer] = []
+    public var canUndo: Bool { self.undoStack.isEmpty == false }
+    public var canRedo: Bool { self.redoStack.isEmpty == false }
 
     // MARK: - Lifecycle
 
