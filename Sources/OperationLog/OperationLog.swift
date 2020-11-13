@@ -159,7 +159,7 @@ public struct OperationLog<ActorID: Comparable & Hashable & Codable, LogSnapshot
     public func serialize() throws -> Data {
         let container = Container(initialSnapshot: self.initialSnapshot,
                                   operations: self.operations,
-                                  summary: self.summary)
+                                  summary: self.initialSummary)
         return try JSONEncoder().encode(container)
     }
 }
