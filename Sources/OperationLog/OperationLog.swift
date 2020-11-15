@@ -135,15 +135,38 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// synced to the current log
     /// - Parameter operations: The operationContainers which should be added
     public mutating func insert(_ operations: [OperationContainer]) {
-        let sortedInsertOperations = operations.sorted(by: { $0.clock < $1.clock })
-        guard let latestClockInserted = sortedInsertOperations.last?.clock else { return }
-
-
+        let sortedInsertOperations = operations.sorted(by: { $0.clock > $1.clock })
+        guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
 
         self.clockProvider.merge(latestClockInserted)
-        // This can be improved for better performance
-        let allOperations = Set(sortedInsertOperations + self.operations)
-        self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
+
+        if self.operations.isEmpty {
+            self.operations = Array(sortedInsertOperations.reversed())
+        } else {
+            var resultingArray = self.operations
+            // Add operations to existing array in a sorted manner, search insert positions from end
+            // as we assume that operations are more probable to be inserted at the end.
+            var searchStartIndex = self.operations.count - 1
+            for operation in sortedInsertOperations {
+                for index in stride(from: searchStartIndex, through: 0, by: -1) {
+                    let currentOperation = self.operations[index]
+                    if currentOperation.id == operation.id {
+                        searchStartIndex = index
+                        break
+                    } else if currentOperation.clock < operation.clock {
+                        resultingArray.insert(operation, at: index + 1)
+                        searchStartIndex = index
+                        break
+                    } else if index == 0 {
+                        resultingArray.insert(operation, at: 0)
+                        searchStartIndex = index
+                        break
+                    }
+                }
+            }
+            self.operations = resultingArray
+        }
+
         self.recalculateMostRecentSnapshot()
     }
 
