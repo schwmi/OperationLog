@@ -135,11 +135,14 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// synced to the current log
     /// - Parameter operations: The operationContainers which should be added
     public mutating func insert(_ operations: [OperationContainer]) {
-        guard let maxClock = operations.max(by: { $0.clock < $1.clock })?.clock else { return }
+        let sortedInsertOperations = operations.sorted(by: { $0.clock < $1.clock })
+        guard let latestClockInserted = sortedInsertOperations.last?.clock else { return }
 
-        self.clockProvider.merge(maxClock)
+
+
+        self.clockProvider.merge(latestClockInserted)
         // This can be improved for better performance
-        let allOperations = Set(operations + self.operations)
+        let allOperations = Set(sortedInsertOperations + self.operations)
         self.operations = allOperations.sorted(by: { $0.clock < $1.clock })
         self.recalculateMostRecentSnapshot()
     }
