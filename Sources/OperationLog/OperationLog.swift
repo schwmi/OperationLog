@@ -36,12 +36,12 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
     /// Wraps operations with timestamp and actor information when applied to the log
     public struct OperationContainer {
-        let id: UUID
-        let actor: ActorID
-        let clock: VectorClock<ActorID>
-        let operation: Operation
+        public let id: UUID
+        public let actor: ActorID
+        public let clock: VectorClock<ActorID>
+        public let operation: Operation
 
-        init(id: UUID = UUID(), actor: ActorID, clock: VectorClock<ActorID>, operation: Operation) {
+        public init(id: UUID = UUID(), actor: ActorID, clock: VectorClock<ActorID>, operation: Operation) {
             self.id = id
             self.actor = actor
             self.clock = clock
