@@ -12,8 +12,6 @@ public protocol Serializable {
 /// Operation which can be stored in the log
 public protocol LogOperation: Serializable {
     var description: String? { get }
-    func serialize() throws -> Data
-    static func deserialize(fromData data: Data) throws -> Self
 }
 
 /// Reduced form of n operations at a given point in time
@@ -74,6 +72,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
     /// Initializes a new OperationLog
     /// - Parameters:
+    ///   - logID: Unambiguously identifies a log, can be used to check if two OperationLogs can be merged
     ///   - actorID: The actorID which is used for new timestamps when applying new operations
     ///   - initialSnapshot: The snapshot which identifies the initial state in which successive operations are reduced into
     public init(logID: LogID, actorID: ActorID, initialSnapshot: LogSnapshot) {
