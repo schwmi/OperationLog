@@ -10,9 +10,13 @@ public extension OperationLog {
 
         public struct AppliedOperation {
 
+            /// Informs how an operation was applied to a snapshot
             public enum ApplyType {
+                /// The operation was fully applied
                 case fullApplied
+                /// Only parts of the operation could be applied to the snapshot
                 case partialApplied(reason: String)
+                /// The operation had to be skipped (e.g. because a merged operation, which was executed before, made the operation obsolete)
                 case skipped(reason: String)
 
                 public var isSkipped: Bool {
