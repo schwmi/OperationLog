@@ -97,6 +97,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// - Throws: if decoding of data fails
     public init(actorID: ActorID, data: Data) throws {
         let container = try JSONDecoder().decode(Container.self, from: data)
+        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock < $1.clock }), "Operations should be persisted in a sorted state")
         self.actorID = actorID
         let clock = container.operations.last?.clock ?? .init(actorID: actorID)
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
@@ -336,5 +337,17 @@ private extension OperationLog {
         case .skipped:
             return nil
         }
+    }
+}
+
+private extension Array {
+
+    func isSorted(isOrderedBefore: (Element, Element) -> Bool) -> Bool {
+        for i in 1..<self.count {
+            if isOrderedBefore(self[i-1], self[i]) == false {
+                return false
+            }
+        }
+        return true
     }
 }
