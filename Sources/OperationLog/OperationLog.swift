@@ -112,10 +112,6 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
     // MARK: - OperationLog
 
-    func logDescriptions(limit: Int) -> [String] {
-        return self.operations.suffix(limit).map { $0.operation.description ?? " - no description - " }
-    }
-
     /// Merge another operation log into the current one
     /// - Parameter operationLog: The log which should be merged
     public mutating func merge(_ operationLog: OperationLog) {
