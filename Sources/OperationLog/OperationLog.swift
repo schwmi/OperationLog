@@ -121,7 +121,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
     /// - Parameter operation: The operation which should be added
     public mutating func append(_ operation: Operation) {
-        if let reverseOperation = self.appendOperationToSnapshot(operation) {
+        if let reverseOperation = self.applyOperationToSnapshot(operation) {
             self.undoStack.append(reverseOperation)
         }
     }
@@ -169,7 +169,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func undo() {
         guard self.undoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.appendOperationToSnapshot(self.undoStack.removeLast()) {
+        if let reverseOperation = self.applyOperationToSnapshot(self.undoStack.removeLast()) {
             self.redoStack.append(reverseOperation)
         }
     }
@@ -178,7 +178,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func redo() {
         guard self.redoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.appendOperationToSnapshot(self.redoStack.removeLast()) {
+        if let reverseOperation = self.applyOperationToSnapshot(self.redoStack.removeLast()) {
             self.undoStack.append(reverseOperation)
         }
     }
@@ -320,7 +320,9 @@ private extension OperationLog {
     }
 
     /// Appends a new operation to the log and applies it to the most recent snapshot
-    mutating func appendOperationToSnapshot(_ operation: Operation) -> Operation? {
+    /// - Parameter operation: The operation which should be appended
+    /// - Returns: The operation to undo the change
+    mutating func applyOperationToSnapshot(_ operation: Operation) -> Operation? {
         let operationContainer: OperationContainer = .init(actor: self.actorID,
                                                            clock: self.clockProvider.next(),
                                                            operation: operation)
