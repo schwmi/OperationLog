@@ -42,7 +42,7 @@ public extension OperationLog {
         /// Sorted array (apply order) of operation infos
         public var operationInfos: [AppliedOperation]
         
-        mutating func apply(_ operation: OperationContainer, outcome: Outcome<Operation>) {
+        mutating func apply(_ operation: LoggedOperation, outcome: Outcome<Operation>) {
             self.actors.insert(operation.actor)
             self.latestClock = operation.clock
             self.operationCount += 1

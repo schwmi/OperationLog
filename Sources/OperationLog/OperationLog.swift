@@ -26,14 +26,14 @@ public typealias Identifier = Comparable & Hashable & Codable
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
-///    - OperationContainer … An operation which is already applied is wrapped into a OperationContainer (has additional meta data, like timestamp)
+///    - LoggedOperation … An operation which is already applied is wrapped into a LoggedOperation (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
 
     public typealias Operation = LogSnapshot.Operation
 
     /// Wraps operations with timestamp and actor information when applied to the log
-    public struct OperationContainer {
+    public struct LoggedOperation {
         public let id: UUID
         public let actor: ActorID
         public let clock: VectorClock<ActorID>
@@ -64,7 +64,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Summary information about all applied operations
     public private(set) var summary: Summary
     /// Applied Operations, clock sorted
-    public private(set) var operations: [OperationContainer] = []
+    public private(set) var operations: [LoggedOperation] = []
     public var canUndo: Bool { self.undoStack.isEmpty == false }
     public var canRedo: Bool { self.redoStack.isEmpty == false }
 
@@ -126,10 +126,10 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         }
     }
 
-    /// Insert an array of OperationContainers into a log - normally those are operations which where added into another log and are now
+    /// Insert an array of LoggedOperation into a log - normally those are operations which where added into another log and are now
     /// synced to the current log
-    /// - Parameter operations: The operationContainers which should be added
-    public mutating func insert(_ operations: [OperationContainer]) {
+    /// - Parameter operations: The LoggedOperations which should be added
+    public mutating func insert(_ operations: [LoggedOperation]) {
         let sortedInsertOperations = operations.sorted(by: { $0.clock > $1.clock })
         guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
 
@@ -213,7 +213,7 @@ extension OperationLog {
         let logID: LogID
         let initialSnapshot: LogSnapshot
         let summary: Summary
-        let operations: [OperationContainer]
+        let operations: [LoggedOperation]
 
         enum CodingKeys: String, CodingKey {
             case operations
@@ -222,7 +222,7 @@ extension OperationLog {
             case logID
         }
 
-        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [OperationContainer], summary: Summary) {
+        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [LoggedOperation], summary: Summary) {
             self.initialSnapshot = initialSnapshot
             self.operations = operations
             self.summary = summary
@@ -234,7 +234,7 @@ extension OperationLog {
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
-            self.operations = try container.decode([OperationContainer].self, forKey: .operations)
+            self.operations = try container.decode([LoggedOperation].self, forKey: .operations)
             self.logID = try container.decode(LogID.self, forKey: .logID)
         }
 
@@ -249,9 +249,9 @@ extension OperationLog {
     }
 }
 
-// MARK: OperationContainer: Codable
+// MARK: LoggedOperation: Codable
 
-extension OperationLog.OperationContainer: Codable {
+extension OperationLog.LoggedOperation: Codable {
 
     enum CodingKeys: String, CodingKey {
         case uuid
@@ -281,11 +281,11 @@ extension OperationLog.OperationContainer: Codable {
     }
 }
 
-// MARK: OperationContainer: Hashable, Equatable
+// MARK: LoggedOperation: Hashable, Equatable
 
-extension OperationLog.OperationContainer: Equatable, Hashable {
+extension OperationLog.LoggedOperation: Equatable, Hashable {
 
-    public static func == (lhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer, rhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer) -> Bool {
+    public static func == (lhs: OperationLog<LogID, ActorID, LogSnapshot>.LoggedOperation, rhs: OperationLog<LogID, ActorID, LogSnapshot>.LoggedOperation) -> Bool {
         return lhs.clock == rhs.clock
     }
 
@@ -323,13 +323,13 @@ private extension OperationLog {
     /// - Parameter operation: The operation which should be appended
     /// - Returns: The operation to undo the change
     mutating func applyOperationToSnapshot(_ operation: Operation) -> Operation? {
-        let operationContainer: OperationContainer = .init(actor: self.actorID,
-                                                           clock: self.clockProvider.next(),
-                                                           operation: operation)
-        self.operations.append(operationContainer)
+        let loggedOperation: LoggedOperation = .init(actor: self.actorID,
+                                                     clock: self.clockProvider.next(),
+                                                     operation: operation)
+        self.operations.append(loggedOperation)
         let (newSnapshot, outcome) = self.snapshot.applying(operation)
         self.snapshot = newSnapshot
-        self.summary.apply(operationContainer, outcome: outcome)
+        self.summary.apply(loggedOperation, outcome: outcome)
         switch outcome {
         case .fullApplied(let undoOperation), .partialApplied(let undoOperation, _):
             return undoOperation
