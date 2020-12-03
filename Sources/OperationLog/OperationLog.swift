@@ -24,9 +24,10 @@ public protocol Snapshot: Serializable {
 public typealias Identifier = Comparable & Hashable & Codable
 
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
+///
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
-///    - LoggedOperation … An operation which is already applied is wrapped into a LoggedOperation (has additional meta data, like timestamp)
+///    - LoggedOperation … Wraps an operation which is already applied (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
 

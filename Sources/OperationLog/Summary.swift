@@ -3,7 +3,9 @@ import Foundation
 
 public extension OperationLog {
 
-    /// Summarizes information about an operation log
+    /// Summarizes information about all operations applied to a log
+    /// Can be used to retrieve aggregated information like total operation count
+    /// or the number of actors which contributed to a log and also apply outcome for each operation (e.g. applied/skipped)
     struct Summary {
 
         public struct AppliedOperation {
