@@ -26,7 +26,7 @@ public typealias Identifier = Comparable & Hashable & Codable
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
-///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
+///    - OperationContainer … An operation which is already applied is wrapped into a OperationContainer (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
 
@@ -143,8 +143,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
             self.operations = Array(sortedInsertOperations.reversed())
         } else {
             var resultingArray = self.operations
-            // Add operations to existing array in a sorted manner, search insert positions from end
-            // as we assume that operations are more probable to be inserted at the end.
+            // Add operations to existing an array in a sorted manner, search insert positions from end
+            // as we assume that operations are more probable to be inserted at the end (later in time).
             var searchStartIndex = self.operations.count - 1
             for operation in sortedInsertOperations {
                 for index in stride(from: searchStartIndex, through: 0, by: -1) {

@@ -8,7 +8,7 @@ public struct VectorClock<ActorID: Identifier> {
         case unixTime
         /// start by 1.0, increase by 1.0 (primarily for testing purposes)
         case monotonicIncrease
-        // Always returns constant timestampe (0.0)
+        // Always returns constant timestamp (0.0)
         case constant
     }
 
@@ -18,7 +18,7 @@ public struct VectorClock<ActorID: Identifier> {
         case concurrent
     }
     
-    struct UnambigousTimestamp: Hashable, Codable {
+    struct UnambiguousTimestamp: Hashable, Codable {
         var actorID: ActorID
         var timestamp: TimeInterval
     }
@@ -26,7 +26,7 @@ public struct VectorClock<ActorID: Identifier> {
     private let timestampProvider: () -> TimeInterval
     private var timestampProviderStrategy: TimestampProviderStrategy
     private var clocksByActors: [ActorID: Int]
-    private var timestamp: UnambigousTimestamp
+    private var timestamp: UnambiguousTimestamp
     
     // MARK: Lifecycle
     
@@ -99,7 +99,7 @@ extension VectorClock: Codable {
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        let timestamp = try values.decode(UnambigousTimestamp.self, forKey: .timestamp)
+        let timestamp = try values.decode(UnambiguousTimestamp.self, forKey: .timestamp)
         let clocksByActors = try values.decode([ActorID: Int].self, forKey: .clocksByActors)
         let providerStrategy = try values.decode(TimestampProviderStrategy.self, forKey: .timestampProviderStrategy)
 
@@ -129,9 +129,9 @@ extension VectorClock: Hashable {
 
 // MARK: - Comparable
 
-extension VectorClock.UnambigousTimestamp: Comparable {
+extension VectorClock.UnambiguousTimestamp: Comparable {
 
-    static func < (lhs: VectorClock<ActorID>.UnambigousTimestamp, rhs: VectorClock<ActorID>.UnambigousTimestamp) -> Bool {
+    static func < (lhs: VectorClock<ActorID>.UnambiguousTimestamp, rhs: VectorClock<ActorID>.UnambiguousTimestamp) -> Bool {
         if lhs.timestamp == rhs.timestamp {
             return lhs.actorID < rhs.actorID
         } else {
@@ -163,7 +163,7 @@ extension VectorClock: Comparable {
 
 // MARK: CustomStringConvertible
 
-extension VectorClock.UnambigousTimestamp: CustomStringConvertible {
+extension VectorClock.UnambiguousTimestamp: CustomStringConvertible {
 
     public var description: String {
         let formattedTimestamp = String(format: "%.2f", self.timestamp)
