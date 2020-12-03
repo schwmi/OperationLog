@@ -2,23 +2,30 @@ import Foundation
 
 
 /// A Vector clock which ensures a total order by additionally adding a timestamp
-public struct VectorClock<ActorID: Identifier> {
+public struct VectorClock<ActorID: Comparable & Hashable & Codable> {
 
     public enum TimestampProviderStrategy: Int, Codable {
         case unixTime
         /// start by 1.0, increase by 1.0 (primarily for testing purposes)
         case monotonicIncrease
-        // Always returns constant timestamp (0.0)
+        // Always returns constant timestampe (0.0)
         case constant
     }
 
-    public enum PartialOrder {
-        case before
-        case after
-        case concurrent
+    public enum TotalOrder {
+        case ascending
+        case descending
+        case equal
     }
-    
-    struct UnambiguousTimestamp: Hashable, Codable {
+
+    public enum PartialOrder {
+        case ascending
+        case descending
+        case concurrent
+        case equal
+    }
+
+    struct UnambigousTimestamp: Hashable, Codable {
         var actorID: ActorID
         var timestamp: TimeInterval
     }
@@ -26,10 +33,10 @@ public struct VectorClock<ActorID: Identifier> {
     private let timestampProvider: () -> TimeInterval
     private var timestampProviderStrategy: TimestampProviderStrategy
     private var clocksByActors: [ActorID: Int]
-    private var timestamp: UnambiguousTimestamp
-    
+    private var timestamp: UnambigousTimestamp
+
     // MARK: Lifecycle
-    
+
     public init(actorID: ActorID, timestampProviderStrategy: TimestampProviderStrategy = .unixTime) {
         self.timestampProviderStrategy = timestampProviderStrategy
         self.clocksByActors = [actorID: 0]
@@ -80,9 +87,28 @@ public struct VectorClock<ActorID: Identifier> {
             }
         }
         if selfGreater != otherGreater {
-            return selfGreater ? .after : .before
+            return selfGreater ? .descending : .ascending
         } else {
-            return .concurrent
+            return .equal
+        }
+    }
+
+    /// Total order between two Vector clocks (including the timestamp to break concurrent ties)
+    /// - Parameter other: The clock which should be compared
+    /// - Returns: The total order
+    public func totalOrder(other: VectorClock) -> TotalOrder {
+        let partialOrder = self.partialOrder(other: other)
+        switch partialOrder {
+        case .descending:
+            return .descending
+        case .ascending:
+            return .ascending
+        case .concurrent, .equal:
+            if self.timestamp == other.timestamp {
+                return .equal
+            } else {
+                return self.timestamp < other.timestamp ? .ascending : .descending
+            }
         }
     }
 }
@@ -99,7 +125,7 @@ extension VectorClock: Codable {
 
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        let timestamp = try values.decode(UnambiguousTimestamp.self, forKey: .timestamp)
+        let timestamp = try values.decode(UnambigousTimestamp.self, forKey: .timestamp)
         let clocksByActors = try values.decode([ActorID: Int].self, forKey: .clocksByActors)
         let providerStrategy = try values.decode(TimestampProviderStrategy.self, forKey: .timestampProviderStrategy)
 
@@ -119,7 +145,11 @@ extension VectorClock: Codable {
 
 // MARK: - Hashable
 
-extension VectorClock: Hashable {
+extension VectorClock: Hashable, Equatable {
+
+    public static func == (lhs: VectorClock<ActorID>, rhs: VectorClock<ActorID>) -> Bool {
+        return lhs.clocksByActors == rhs.clocksByActors && lhs.timestamp == rhs.timestamp
+    }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(self.clocksByActors)
@@ -129,9 +159,9 @@ extension VectorClock: Hashable {
 
 // MARK: - Comparable
 
-extension VectorClock.UnambiguousTimestamp: Comparable {
+extension VectorClock.UnambigousTimestamp: Comparable {
 
-    static func < (lhs: VectorClock<ActorID>.UnambiguousTimestamp, rhs: VectorClock<ActorID>.UnambiguousTimestamp) -> Bool {
+    static func < (lhs: VectorClock<ActorID>.UnambigousTimestamp, rhs: VectorClock<ActorID>.UnambigousTimestamp) -> Bool {
         if lhs.timestamp == rhs.timestamp {
             return lhs.actorID < rhs.actorID
         } else {
@@ -140,30 +170,9 @@ extension VectorClock.UnambiguousTimestamp: Comparable {
     }
 }
 
-extension VectorClock: Comparable {
-
-    public static func == (lhs: VectorClock<ActorID>, rhs: VectorClock<ActorID>) -> Bool {
-        let partialOrder = lhs.partialOrder(other: rhs)
-        if partialOrder == .concurrent {
-            return lhs.timestamp == rhs.timestamp
-        } else {
-            return false
-        }
-    }
-
-    public static func < (lhs: VectorClock<ActorID>, rhs: VectorClock<ActorID>) -> Bool {
-        let partialOrder = lhs.partialOrder(other: rhs)
-        if partialOrder == .concurrent {
-            return lhs.timestamp < rhs.timestamp
-        } else {
-            return partialOrder == .before
-        }
-    }
-}
-
 // MARK: CustomStringConvertible
 
-extension VectorClock.UnambiguousTimestamp: CustomStringConvertible {
+extension VectorClock.UnambigousTimestamp: CustomStringConvertible {
 
     public var description: String {
         let formattedTimestamp = String(format: "%.2f", self.timestamp)

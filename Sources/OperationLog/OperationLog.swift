@@ -98,7 +98,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// - Throws: if decoding of data fails
     public init(actorID: ActorID, data: Data) throws {
         let container = try JSONDecoder().decode(Container.self, from: data)
-        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock < $1.clock }), "Operations should be persisted in a sorted state")
+        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock.totalOrder(other: $1.clock) == .ascending }), "Operations should be persisted in a sorted state")
         self.actorID = actorID
         let clock = container.operations.last?.clock ?? .init(actorID: actorID)
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
@@ -132,7 +132,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// synced to the current log
     /// - Parameter operations: The LoggedOperations which should be added
     public mutating func insert(_ operations: [LoggedOperation]) {
-        let sortedInsertOperations = operations.sorted(by: { $0.clock > $1.clock })
+        let sortedInsertOperations = operations.sorted(by: { $0.clock.totalOrder(other: $1.clock) == .descending })
         guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
 
         self.clockProvider.merge(latestClockInserted)
@@ -150,7 +150,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                     if currentOperation.id == operation.id {
                         searchStartIndex = index
                         break
-                    } else if currentOperation.clock < operation.clock {
+                    } else if currentOperation.clock.totalOrder(other: operation.clock) == .ascending {
                         resultingArray.insert(operation, at: index + 1)
                         searchStartIndex = index
                         break
