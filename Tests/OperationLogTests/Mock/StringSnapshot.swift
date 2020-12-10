@@ -26,11 +26,11 @@ struct StringSnapshot: Snapshot {
             let newSnapshot = self.appending(character: operation.character)
             return (newSnapshot, .fullApplied(undoOperation: undoOperation))
         case .removeLast:
-            guard self.string.isEmpty == false else {
+            guard let lastCharacter = self.string.last else {
                 return (self, .skipped(reason: "Snapshot is empty"))
             }
 
-            let undoOperation = CharacterOperation(kind: .append, character: self.string.last!)
+            let undoOperation = CharacterOperation(kind: .append, character: lastCharacter)
             let newSnapshot = self.removingLast(character: operation.character)
             return (newSnapshot, .fullApplied(undoOperation: undoOperation))
         }

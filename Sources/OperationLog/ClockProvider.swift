@@ -17,11 +17,11 @@ struct ClockProvider<ActorID: Identifier> {
     // MARK: - ClockProvider
 
     mutating func next() -> VectorClock<ActorID> {
-        self.currentClock = self.currentClock.incrementing(self.actorID)
+        self.currentClock = self.currentClock.incrementingClock(of: self.actorID)
         return self.currentClock
     }
 
-    mutating func merge(_ clockProvider: ClockProvider<ActorID>) {
+    mutating func merge(_ clockProvider: Self) {
         self.currentClock = self.currentClock.merging(clockProvider.currentClock)
     }
 

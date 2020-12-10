@@ -13,19 +13,19 @@ final class VectorClockTests: XCTestCase {
         let clock = VectorClock(actorID: "A", timestampProviderStrategy: .monotonicIncrease)
 
         // Increment actor A
-        let incrementedA = clock.incrementing("A")
+        let incrementedA = clock.incrementingClock(of: "A")
         XCTAssertEqual(incrementedA.description, "<A=1 | t: A(2.00)>")
 
         // Increment actor B
-        let incrementedAB = incrementedA.incrementing("B")
+        let incrementedAB = incrementedA.incrementingClock(of: "B")
         XCTAssertEqual(incrementedAB.description, "<A=1, B=1 | t: B(3.00)>")
 
         // Increment actor B again
-        let incrementedABB = incrementedAB.incrementing("B")
+        let incrementedABB = incrementedAB.incrementingClock(of: "B")
         XCTAssertEqual(incrementedABB.description, "<A=1, B=2 | t: B(4.00)>")
 
         // Increment actor A again
-        let incrementedABBA = incrementedABB.incrementing("A")
+        let incrementedABBA = incrementedABB.incrementingClock(of: "A")
         XCTAssertEqual(incrementedABBA.description, "<A=2, B=2 | t: A(5.00)>")
     }
 
@@ -33,11 +33,11 @@ final class VectorClockTests: XCTestCase {
         let clock = VectorClock(actorID: "A", timestampProviderStrategy: .monotonicIncrease)
 
         // Increment actor A
-        let incrementedA = clock.incrementing("A")
+        let incrementedA = clock.incrementingClock(of: "A")
         XCTAssertEqual(incrementedA.description, "<A=1 | t: A(2.00)>")
 
         // Increment actor B
-        let incrementedB = clock.incrementing("B")
+        let incrementedB = clock.incrementingClock(of: "B")
         XCTAssertEqual(incrementedB.description, "<A=0, B=1 | t: B(3.00)>")
 
         // Merge A with B
@@ -52,12 +52,12 @@ final class VectorClockTests: XCTestCase {
         XCTAssertEqual(clock1.partialOrder(other: clock2), .equal)
 
         // Increment actor A
-        let clock1A = clock1.incrementing("A")
+        let clock1A = clock1.incrementingClock(of: "A")
         XCTAssertEqual(clock1.totalOrder(other: clock1A), .ascending)
         XCTAssertEqual(clock1A.totalOrder(other: clock1A), .equal)
 
         // Increment actor B
-        let clock2B = clock2.incrementing("B")
+        let clock2B = clock2.incrementingClock(of: "B")
         XCTAssertEqual(clock1A.partialOrder(other: clock2B), .concurrent)
         XCTAssertEqual(clock1A.totalOrder(other: clock2B), .ascending)
         XCTAssertNotEqual(clock1A.totalOrder(other: clock2B), .descending)
@@ -72,12 +72,12 @@ final class VectorClockTests: XCTestCase {
         XCTAssertEqual(clock1.totalOrder(other: clock2), .ascending)
 
         // Increment actor A
-        let clock1A = clock1.incrementing("A")
+        let clock1A = clock1.incrementingClock(of: "A")
         XCTAssertEqual(clock1.totalOrder(other: clock1A), .ascending)
         XCTAssertEqual(clock1A.totalOrder(other: clock1A), .equal)
 
         // Increment actor B
-        let clock2B = clock2.incrementing("B")
+        let clock2B = clock2.incrementingClock(of: "B")
         XCTAssertEqual(clock1A.totalOrder(other: clock2B), .ascending)
     }
 
@@ -86,7 +86,7 @@ final class VectorClockTests: XCTestCase {
         let encoded = try JSONEncoder().encode(clock)
         let decoded = try JSONDecoder().decode(VectorClock<String>.self, from: encoded)
         XCTAssertEqual(clock.totalOrder(other: decoded), .equal)
-        let increasedClock = decoded.incrementing("B")
+        let increasedClock = decoded.incrementingClock(of: "B")
         print(increasedClock.description)
         XCTAssertEqual(increasedClock.description, "<A=0, B=1 | t: B(2.00)>")
     }
@@ -112,7 +112,7 @@ extension VectorClockTests {
         let clock = VectorClock(actorID: "A", timestampProviderStrategy: .monotonicIncrease)
         clocks.insert(clock)
         for _ in 0..<5000 {
-            clocks.insert(clock.incrementing(actors.randomElement()!))
+            clocks.insert(clock.incrementingClock(of: actors.randomElement()!))
         }
         self.measure {
             _ = clocks.sorted(by: { $0.totalOrder(other: $1) == .ascending })

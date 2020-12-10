@@ -287,7 +287,7 @@ extension OperationLog.LoggedOperation: Codable {
 
 extension OperationLog.LoggedOperation: Equatable, Hashable {
 
-    public static func == (lhs: OperationLog<LogID, ActorID, LogSnapshot>.LoggedOperation, rhs: OperationLog<LogID, ActorID, LogSnapshot>.LoggedOperation) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.clock == rhs.clock
     }
 
