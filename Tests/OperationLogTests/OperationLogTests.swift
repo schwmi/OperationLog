@@ -13,14 +13,6 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(log.snapshot.string, "Result: ABC")
     }
 
-    func testLogDescription() {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
-        log.append(.init(kind: .append, character: "A"))
-        log.append(.init(kind: .append, character: "B"))
-        log.append(.init(kind: .removeLast, character: "B"))
-        XCTAssertEqual(log.logDescriptions(limit: 2), ["Append character: B", "removeLast character: B"])
-    }
-
     func testLogMerging() {
         var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
         var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: .init(string: ""))
@@ -74,7 +66,7 @@ final class OperationLogTests: XCTestCase {
         log.redo()
         log.redo() // no-op (redo queue should be empty)
         XCTAssertEqual(log.snapshot.string, "AB")
-        XCTAssertEqual(log.logDescriptions(limit: .max).count, 8)
+        XCTAssertEqual(log.operations.count, 8)
     }
 
     func testSerialization() throws {

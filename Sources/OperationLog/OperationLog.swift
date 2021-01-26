@@ -24,16 +24,17 @@ public protocol Snapshot: Serializable {
 public typealias Identifier = Comparable & Hashable & Codable
 
 /// Holds a vector clock sorted array of operations, and a provides a snapshot as representation of all applied operations
+///
 /// Terminology:
 ///    - Operation … Used to modify a snapshot
-///    - OperationContontainer … Operations which where already applied in a log are wrapped into a OperationContainer (has additional meta data, like timestamp)
+///    - LoggedOperation … Wraps an operation which is already applied (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
 
     public typealias Operation = LogSnapshot.Operation
 
     /// Wraps operations with timestamp and actor information when applied to the log
-    public struct OperationContainer {
+    public struct LoggedOperation {
         public let id: UUID
         public let actor: ActorID
         public let clock: VectorClock<ActorID>
@@ -64,7 +65,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Summary information about all applied operations
     public private(set) var summary: Summary
     /// Applied Operations, clock sorted
-    public private(set) var operations: [OperationContainer] = []
+    public private(set) var operations: [LoggedOperation] = []
     public var canUndo: Bool { self.undoStack.isEmpty == false }
     public var canRedo: Bool { self.redoStack.isEmpty == false }
 
@@ -97,6 +98,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// - Throws: if decoding of data fails
     public init(actorID: ActorID, data: Data) throws {
         let container = try JSONDecoder().decode(Container.self, from: data)
+        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock.totalOrder(other: $1.clock) == .ascending }), "Operations should be persisted in a sorted state")
         self.actorID = actorID
         let clock = container.operations.last?.clock ?? .init(actorID: actorID)
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
@@ -112,10 +114,6 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
     // MARK: - OperationLog
 
-    func logDescriptions(limit: Int) -> [String] {
-        return self.operations.suffix(limit).map { $0.operation.description ?? " - no description - " }
-    }
-
     /// Merge another operation log into the current one
     /// - Parameter operationLog: The log which should be merged
     public mutating func merge(_ operationLog: OperationLog) {
@@ -125,16 +123,16 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
     /// - Parameter operation: The operation which should be added
     public mutating func append(_ operation: Operation) {
-        if let reverseOperation = self.appendOperationToSnapshot(operation) {
+        if let reverseOperation = self.applyOperationToSnapshot(operation) {
             self.undoStack.append(reverseOperation)
         }
     }
 
-    /// Insert an array of OperationContainers into a log - normally those are operations which where added into another log and are now
+    /// Insert an array of LoggedOperation into a log - normally those are operations which where added into another log and are now
     /// synced to the current log
-    /// - Parameter operations: The operationContainers which should be added
-    public mutating func insert(_ operations: [OperationContainer]) {
-        let sortedInsertOperations = operations.sorted(by: { $0.clock > $1.clock })
+    /// - Parameter operations: The LoggedOperations which should be added
+    public mutating func insert(_ operations: [LoggedOperation]) {
+        let sortedInsertOperations = operations.sorted(by: { $0.clock.totalOrder(other: $1.clock) == .descending })
         guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
 
         self.clockProvider.merge(latestClockInserted)
@@ -143,8 +141,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
             self.operations = Array(sortedInsertOperations.reversed())
         } else {
             var resultingArray = self.operations
-            // Add operations to existing array in a sorted manner, search insert positions from end
-            // as we assume that operations are more probable to be inserted at the end.
+            // Add operations to existing an array in a sorted manner, search insert positions from end
+            // as we assume that operations are more probable to be inserted at the end (later in time).
             var searchStartIndex = self.operations.count - 1
             for operation in sortedInsertOperations {
                 for index in stride(from: searchStartIndex, through: 0, by: -1) {
@@ -152,7 +150,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                     if currentOperation.id == operation.id {
                         searchStartIndex = index
                         break
-                    } else if currentOperation.clock < operation.clock {
+                    } else if currentOperation.clock.totalOrder(other: operation.clock) == .ascending {
                         resultingArray.insert(operation, at: index + 1)
                         searchStartIndex = index
                         break
@@ -176,7 +174,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func undo() {
         guard self.undoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.appendOperationToSnapshot(self.undoStack.removeLast()) {
+        if let reverseOperation = self.applyOperationToSnapshot(self.undoStack.removeLast()) {
             self.redoStack.append(reverseOperation)
         }
     }
@@ -185,7 +183,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func redo() {
         guard self.redoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.appendOperationToSnapshot(self.redoStack.removeLast()) {
+        if let reverseOperation = self.applyOperationToSnapshot(self.redoStack.removeLast()) {
             self.undoStack.append(reverseOperation)
         }
     }
@@ -220,7 +218,7 @@ extension OperationLog {
         let logID: LogID
         let initialSnapshot: LogSnapshot
         let summary: Summary
-        let operations: [OperationContainer]
+        let operations: [LoggedOperation]
 
         enum CodingKeys: String, CodingKey {
             case operations
@@ -229,7 +227,7 @@ extension OperationLog {
             case logID
         }
 
-        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [OperationContainer], summary: Summary) {
+        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [LoggedOperation], summary: Summary) {
             self.initialSnapshot = initialSnapshot
             self.operations = operations
             self.summary = summary
@@ -241,7 +239,7 @@ extension OperationLog {
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
-            self.operations = try container.decode([OperationContainer].self, forKey: .operations)
+            self.operations = try container.decode([LoggedOperation].self, forKey: .operations)
             self.logID = try container.decode(LogID.self, forKey: .logID)
         }
 
@@ -256,9 +254,9 @@ extension OperationLog {
     }
 }
 
-// MARK: OperationContainer: Codable
+// MARK: LoggedOperation: Codable
 
-extension OperationLog.OperationContainer: Codable {
+extension OperationLog.LoggedOperation: Codable {
 
     enum CodingKeys: String, CodingKey {
         case uuid
@@ -288,11 +286,11 @@ extension OperationLog.OperationContainer: Codable {
     }
 }
 
-// MARK: OperationContainer: Hashable, Equatable
+// MARK: LoggedOperation: Hashable, Equatable
 
-extension OperationLog.OperationContainer: Equatable, Hashable {
+extension OperationLog.LoggedOperation: Equatable, Hashable {
 
-    public static func == (lhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer, rhs: OperationLog<LogID, ActorID, LogSnapshot>.OperationContainer) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.clock == rhs.clock
     }
 
@@ -328,19 +326,33 @@ private extension OperationLog {
     }
 
     /// Appends a new operation to the log and applies it to the most recent snapshot
-    mutating func appendOperationToSnapshot(_ operation: Operation) -> Operation? {
-        let operationContainer: OperationContainer = .init(actor: self.actorID,
-                                                           clock: self.clockProvider.next(),
-                                                           operation: operation)
-        self.operations.append(operationContainer)
+    /// - Parameter operation: The operation which should be appended
+    /// - Returns: The operation to undo the change
+    mutating func applyOperationToSnapshot(_ operation: Operation) -> Operation? {
+        let loggedOperation: LoggedOperation = .init(actor: self.actorID,
+                                                     clock: self.clockProvider.next(),
+                                                     operation: operation)
+        self.operations.append(loggedOperation)
         let (newSnapshot, outcome) = self.snapshot.applying(operation)
         self.snapshot = newSnapshot
-        self.summary.apply(operationContainer, outcome: outcome)
+        self.summary.apply(loggedOperation, outcome: outcome)
         switch outcome {
         case .fullApplied(let undoOperation), .partialApplied(let undoOperation, _):
             return undoOperation
         case .skipped:
             return nil
         }
+    }
+}
+
+private extension Array {
+
+    func isSorted(isOrderedBefore: (Element, Element) -> Bool) -> Bool {
+        for i in 1..<self.count {
+            if isOrderedBefore(self[i-1], self[i]) == false {
+                return false
+            }
+        }
+        return true
     }
 }

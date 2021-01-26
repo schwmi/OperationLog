@@ -3,21 +3,27 @@ import Foundation
 
 public extension OperationLog {
 
-    /// Summarizes information about an operation log
+    /// Summarizes information about all operations applied to a log
+    /// Can be used to retrieve aggregated information like total operation count
+    /// or the number of actors which contributed to a log and also apply outcome for each operation (e.g. applied/skipped)
     struct Summary {
 
         public struct AppliedOperation {
 
+            /// Informs how an operation was applied to a snapshot
             public enum ApplyType {
-                case fullApplied
-                case partialApplied(reason: String)
+                /// The operation was fully applied
+                case full
+                /// Only parts of the operation could be applied to the snapshot
+                case partial(reason: String)
+                /// The operation had to be skipped (e.g. because a merged operation, which was executed before, made the operation obsolete)
                 case skipped(reason: String)
 
                 public var isSkipped: Bool {
                     switch self {
                     case .skipped:
                         return true
-                    case .partialApplied, .fullApplied:
+                    case .partial, .full:
                         return false
                     }
                 }
@@ -42,16 +48,16 @@ public extension OperationLog {
         /// Sorted array (apply order) of operation infos
         public var operationInfos: [AppliedOperation]
         
-        mutating func apply(_ operation: OperationContainer, outcome: Outcome<Operation>) {
+        mutating func apply(_ operation: LoggedOperation, outcome: Outcome<Operation>) {
             self.actors.insert(operation.actor)
             self.latestClock = operation.clock
             self.operationCount += 1
             let applyType: AppliedOperation.ApplyType = {
                 switch outcome {
                 case .fullApplied:
-                    return .fullApplied
+                    return .full
                 case .partialApplied(_, let reason):
-                    return .partialApplied(reason: reason)
+                    return .partial(reason: reason)
                 case .skipped(let reason):
                     return .skipped(reason: reason)
                 }
@@ -82,10 +88,10 @@ extension OperationLog.Summary.AppliedOperation.ApplyType: Codable {
 
         switch key {
         case .fullApplied:
-            self = .fullApplied
+            self = .full
         case .partialApplied:
             let reason = try container.decode(String.self, forKey: .partialApplied)
-            self = .partialApplied(reason: reason)
+            self = .partial(reason: reason)
         case .skipped:
             let reason = try container.decode(String.self, forKey: .skipped)
             self = .skipped(reason: reason)
@@ -99,9 +105,9 @@ extension OperationLog.Summary.AppliedOperation.ApplyType: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         switch self {
-        case .fullApplied:
+        case .full:
             try container.encodeNil(forKey: .fullApplied)
-        case .partialApplied(let reason):
+        case .partial(let reason):
             try container.encode(reason, forKey: .partialApplied)
         case .skipped(let reason):
             try container.encode(reason, forKey: .skipped)
