@@ -45,6 +45,18 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(logA.snapshot.string, "ABCDEFGHIJ")
     }
 
+    func testMergeNoOp() {
+        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
+        log.append(.init(kind: .append, character: "A"))
+        log.append(.init(kind: .append, character: "B"))
+        log.undo()
+        XCTAssertTrue(log.canUndo)
+        XCTAssertTrue(log.canRedo)
+        log.merge(log)
+        XCTAssertTrue(log.canUndo)
+        XCTAssertTrue(log.canRedo)
+    }
+
     func testUndoRedo() {
         var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
         log.append(.init(kind: .append, character: "A"))

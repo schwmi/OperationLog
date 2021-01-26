@@ -163,6 +163,9 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                     }
                 }
             }
+            // if the count hasn't changed, the merge was a no-op (same operations)
+            guard self.operations.count != resultingArray.count else { return }
+
             self.operations = resultingArray
         }
 
@@ -321,6 +324,7 @@ private extension OperationLog {
         self.summary = currentSummary
         self.snapshot = currentSnapshot
         self.undoStack = currentUndoStack
+        self.redoStack = []
     }
 
     /// Appends a new operation to the log and applies it to the most recent snapshot
