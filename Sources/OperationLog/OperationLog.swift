@@ -10,13 +10,13 @@ public protocol Serializable {
 }
 
 /// Operation which can be stored in the log
-public protocol LogOperation: Serializable {
+public protocol LogOperationProtocol: Serializable {
     var description: String? { get }
 }
 
 /// Reduced form of n operations at a given point in time
-public protocol Snapshot: Serializable {
-    associatedtype Operation: LogOperation
+public protocol SnapshotProtocol: Serializable {
+    associatedtype Operation: LogOperationProtocol
 
     func applying(_ operation: Operation) -> (snapshot: Self, outcome: Outcome<Operation>)
 }
@@ -29,7 +29,7 @@ public typealias Identifier = Comparable & Hashable & Codable
 ///    - Operation … Used to modify a snapshot
 ///    - LoggedOperation … Wraps an operation which is already applied (has additional meta data, like timestamp)
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
-public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: Snapshot> {
+public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: SnapshotProtocol> {
 
     public typealias Operation = LogSnapshot.Operation
 
@@ -202,7 +202,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 // MARK: - Outcome
 
 /// Possible outcomes after applying an operation
-public enum Outcome<Operation: LogOperation> {
+public enum Outcome<Operation: LogOperationProtocol> {
     case fullApplied(undoOperation: Operation)
     case partialApplied(undoOperation: Operation, reason: String)
     case skipped(reason: String)

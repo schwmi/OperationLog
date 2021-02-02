@@ -7,7 +7,7 @@ import OperationLog
 
 
 /// Snapshot which represents a string
-struct StringSnapshot: Snapshot {
+struct StringSnapshot: SnapshotProtocol {
 
     // MARK: - Properties
 

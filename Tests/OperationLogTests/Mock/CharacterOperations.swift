@@ -7,7 +7,7 @@ import OperationLog
 
 
 /// Operations to modify characters in a string
-struct CharacterOperation: LogOperation {
+struct CharacterOperation: LogOperationProtocol {
 
     enum Kind: String, Codable {
         case append
