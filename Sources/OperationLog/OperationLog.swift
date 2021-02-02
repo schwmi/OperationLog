@@ -348,6 +348,8 @@ private extension OperationLog {
 private extension Array {
 
     func isSorted(isOrderedBefore: (Element, Element) -> Bool) -> Bool {
+        guard self.isEmpty == false else { return true }
+
         for i in 1..<self.count {
             if isOrderedBefore(self[i-1], self[i]) == false {
                 return false
