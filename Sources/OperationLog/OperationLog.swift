@@ -48,8 +48,14 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         }
     }
 
-    private var redoStack: [Operation] = []
-    private var undoStack: [Operation] = []
+    /// Wraps on operation on the undo/redo stack
+    public struct UndoOperation {
+        /// The ID of the operation which is reverted with this undo operation
+        public let revertingOperationID: UUID
+        /// The operation which is applied when triggering undo/redo
+        public let operation: Operation
+    }
+
     private var clockProvider: ClockProvider<ActorID>
     private var initialSnapshot: LogSnapshot
     private var initialSummary: Summary
@@ -68,6 +74,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public private(set) var operations: [LoggedOperation] = []
     public var canUndo: Bool { self.undoStack.isEmpty == false }
     public var canRedo: Bool { self.redoStack.isEmpty == false }
+    private(set) public var redoStack: [UndoOperation] = []
+    private(set) public var undoStack: [UndoOperation] = []
 
     // MARK: - Lifecycle
 
@@ -123,8 +131,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
     /// - Parameter operation: The operation which should be added
     public mutating func append(_ operation: Operation) {
-        if let reverseOperation = self.applyOperationToSnapshot(operation) {
-            self.undoStack.append(reverseOperation)
+        if let result = self.applyOperationToSnapshot(operation) {
+            self.undoStack.append(.init(revertingOperationID: result.loggedOperation.id, operation: result.undoOperation))
         }
     }
 
@@ -174,8 +182,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func undo() {
         guard self.undoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.applyOperationToSnapshot(self.undoStack.removeLast()) {
-            self.redoStack.append(reverseOperation)
+        if let result = self.applyOperationToSnapshot(self.undoStack.removeLast().operation) {
+            self.redoStack.append(.init(revertingOperationID: result.loggedOperation.id, operation: result.undoOperation))
         }
     }
 
@@ -183,8 +191,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func redo() {
         guard self.redoStack.isEmpty == false else { return }
 
-        if let reverseOperation = self.applyOperationToSnapshot(self.redoStack.removeLast()) {
-            self.undoStack.append(reverseOperation)
+        if let result = self.applyOperationToSnapshot(self.redoStack.removeLast().operation) {
+            self.undoStack.append(.init(revertingOperationID: result.loggedOperation.id, operation: result.undoOperation))
         }
     }
 
@@ -307,14 +315,14 @@ private extension OperationLog {
     mutating func recalculateMostRecentSnapshot() {
         var currentSnapshot = self.initialSnapshot
         var currentSummary = self.initialSummary
-        var currentUndoStack: [Operation] = []
+        var currentUndoStack: [UndoOperation] = []
         for operation in self.operations {
             let (snapshot, outcome) = currentSnapshot.applying(operation.operation)
             currentSnapshot = snapshot
             currentSummary.apply(operation, outcome: outcome)
             switch outcome {
             case .fullApplied(let undoOperation), .partialApplied(let undoOperation, _):
-                currentUndoStack.append(undoOperation)
+                currentUndoStack.append(.init(revertingOperationID: operation.id, operation: undoOperation))
             case .skipped:
                 break
             }
@@ -328,7 +336,7 @@ private extension OperationLog {
     /// Appends a new operation to the log and applies it to the most recent snapshot
     /// - Parameter operation: The operation which should be appended
     /// - Returns: The operation to undo the change
-    mutating func applyOperationToSnapshot(_ operation: Operation) -> Operation? {
+    mutating func applyOperationToSnapshot(_ operation: Operation) -> (loggedOperation: LoggedOperation, undoOperation: Operation)? {
         let loggedOperation: LoggedOperation = .init(actor: self.actorID,
                                                      clock: self.clockProvider.next(),
                                                      operation: operation)
@@ -338,7 +346,7 @@ private extension OperationLog {
         self.summary.apply(loggedOperation, outcome: outcome)
         switch outcome {
         case .fullApplied(let undoOperation), .partialApplied(let undoOperation, _):
-            return undoOperation
+            return (loggedOperation, undoOperation)
         case .skipped:
             return nil
         }
