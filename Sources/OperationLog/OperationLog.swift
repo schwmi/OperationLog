@@ -49,7 +49,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     }
 
     /// Wraps on operation on the undo/redo stack
-    public struct UndoOperation {
+    public struct UndoOperationContainer {
         /// The ID of the operation which is reverted with this undo operation
         public let revertingOperationID: UUID
         /// The operation which is applied when triggering undo/redo
@@ -74,8 +74,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public private(set) var operations: [LoggedOperation] = []
     public var canUndo: Bool { self.undoStack.isEmpty == false }
     public var canRedo: Bool { self.redoStack.isEmpty == false }
-    private(set) public var redoStack: [UndoOperation] = []
-    private(set) public var undoStack: [UndoOperation] = []
+    private(set) public var redoStack: [UndoOperationContainer] = []
+    private(set) public var undoStack: [UndoOperationContainer] = []
 
     // MARK: - Lifecycle
 
@@ -315,7 +315,7 @@ private extension OperationLog {
     mutating func recalculateMostRecentSnapshot() {
         var currentSnapshot = self.initialSnapshot
         var currentSummary = self.initialSummary
-        var currentUndoStack: [UndoOperation] = []
+        var currentUndoStack: [UndoOperationContainer] = []
         for operation in self.operations {
             let (snapshot, outcome) = currentSnapshot.applying(operation.operation)
             currentSnapshot = snapshot
