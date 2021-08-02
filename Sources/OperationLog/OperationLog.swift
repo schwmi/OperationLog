@@ -92,10 +92,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         precondition(emptySnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
-        let (u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16) = UUID().uuid
-        let uuidBytes = [u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16]
-        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: Data(bytes: uuidBytes, count: uuidBytes.count)
- )
+
+        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: UUID().data)
         self.snapshot = initialSnapshot.snapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
@@ -254,7 +252,7 @@ extension OperationLog {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
             let logID = try container.decode(LogID.self, forKey: .logID)
-            let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? Data() // use logID
+            let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? UUID().data
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = .init(snapshot: try LogSnapshot.deserialize(fromData: snapshotData),
                                          sha256: initialSha256)
@@ -376,5 +374,14 @@ private extension Array {
             }
         }
         return true
+    }
+}
+
+private extension UUID {
+
+    var data: Data {
+        let (u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16) = UUID().uuid
+        let uuidBytes = [u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16]
+        return .init(uuidBytes)
     }
 }
