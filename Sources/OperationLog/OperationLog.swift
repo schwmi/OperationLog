@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 
@@ -209,6 +210,30 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                                   operations: self.operations,
                                   summary: self.initialSummary)
         return try JSONEncoder().encode(container)
+    }
+
+    public mutating func reduce(until operationID: UUID) throws {
+        var initialSnapshot = self.initialSnapshot.snapshot
+        var initialSummary = self.initialSummary
+        var hash = SHA256()
+        var cutoffIndex: Int?
+        hash.update(data: self.initialSnapshot.sha256)
+        for (index, loggedOperation) in self.operations.enumerated() {
+            let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
+            initialSnapshot = snapshot
+            initialSummary.apply(loggedOperation, outcome: outcome)
+            hash.update(data: loggedOperation.id.data)
+            if loggedOperation.id == operationID {
+                cutoffIndex = index
+                break
+            }
+        }
+        guard let cutoffIndex = cutoffIndex else { return }
+
+        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
+        self.initialSummary = initialSummary
+        self.operations = Array(self.operations.suffix(from: cutoffIndex))
+        self.recalculateMostRecentSnapshot()
     }
 }
 
