@@ -4,18 +4,18 @@ import XCTest
 typealias CharacterOperationLog = OperationLog<String, String, StringSnapshot>
 
 final class OperationLogTests: XCTestCase {
-/*
+
     func testAddingOperation() {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
-        XCTAssertEqual(log.snapshot.string, "Result: ABC")
+        XCTAssertEqual(log.snapshot.string, "ABC")
     }
 
     func testLogMerging() {
-        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
-        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: .init(string: ""))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
         logA.append(.init(kind: .append, character: "C"))
@@ -38,7 +38,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testMergeNoOp() {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.undo()
@@ -50,7 +50,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testUndoRedo() {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         XCTAssertEqual(log.snapshot.string, "AB")
@@ -70,7 +70,7 @@ final class OperationLogTests: XCTestCase {
     }
 
     func testSerialization() throws {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.append(.init(kind: .append, character: "C"))
@@ -104,7 +104,7 @@ final class OperationLogTests: XCTestCase {
 extension OperationLogTests {
 
     func testAddOperationPerformance() {
-        var log = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
         self.measure {
             for _ in 1..<1000 {
                 log.append(.init(kind: .append, character: "A"))
@@ -113,8 +113,8 @@ extension OperationLogTests {
     }
 
     func testAddAndMergePerformance() {
-        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: StringSnapshot(string: ""))
-        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: StringSnapshot(string: ""))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
         // Add operations to logA
         for _ in 1..<100 {
             logA.append(.init(kind: .append, character: "A"))
@@ -126,5 +126,5 @@ extension OperationLogTests {
             }
         }
         XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)
-    }*/
+    }
 }
