@@ -19,6 +19,8 @@ public protocol SnapshotProtocol: Serializable {
     associatedtype Operation: LogOperationProtocol
 
     func applying(_ operation: Operation) -> (snapshot: Self, outcome: Outcome<Operation>)
+
+    static func makeEmptySnapshot() -> Self
 }
 
 public typealias Identifier = Comparable & Hashable & Codable
@@ -32,6 +34,16 @@ public typealias Identifier = Comparable & Hashable & Codable
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: SnapshotProtocol> {
 
     public typealias Operation = LogSnapshot.Operation
+
+    public struct InitialSnapshot {
+        public let snapshot: LogSnapshot
+        public let sha256: Data
+
+        public init(snapshot: LogSnapshot, sha256: Data) {
+            self.snapshot = snapshot
+            self.sha256 = sha256
+        }
+    }
 
     /// Wraps operations with timestamp and actor information when applied to the log
     public struct LoggedOperation {
@@ -51,7 +63,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     private var redoStack: [Operation] = []
     private var undoStack: [Operation] = []
     private var clockProvider: ClockProvider<ActorID>
-    private var initialSnapshot: LogSnapshot
+    private var initialSnapshot: InitialSnapshot
     private var initialSummary: Summary
 
     // MARK: - Properties
@@ -75,13 +87,16 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// - Parameters:
     ///   - logID: Unambiguously identifies a log, can be used to check if two OperationLogs can be merged
     ///   - actorID: The actorID which is used for new timestamps when applying new operations
-    ///   - initialSnapshot: The snapshot which identifies the initial state in which successive operations are reduced into
-    public init(logID: LogID, actorID: ActorID, initialSnapshot: LogSnapshot) {
-        precondition(initialSnapshot is AnyClass == false, "Snapshot must be a value type")
+    public init(logID: LogID, actorID: ActorID) {
+        let emptySnapshot = LogSnapshot.makeEmptySnapshot()
+        precondition(emptySnapshot is AnyClass == false, "Snapshot must be a value type")
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
-        self.initialSnapshot = initialSnapshot
-        self.snapshot = initialSnapshot
+        let (u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16) = UUID().uuid
+        let uuidBytes = [u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16]
+        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: Data(bytes: uuidBytes, count: uuidBytes.count)
+ )
+        self.snapshot = initialSnapshot.snapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
                                      operationCount: 0,
@@ -104,7 +119,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
         self.operations = container.operations
         self.initialSnapshot = container.initialSnapshot
-        self.snapshot = container.initialSnapshot
+        self.snapshot = container.initialSnapshot.snapshot
         self.initialSummary = container.summary
         self.summary = container.summary
         self.logID = container.logID
@@ -216,18 +231,19 @@ extension OperationLog {
     private struct Container: Codable {
 
         let logID: LogID
-        let initialSnapshot: LogSnapshot
+        let initialSnapshot: InitialSnapshot
         let summary: Summary
         let operations: [LoggedOperation]
 
         enum CodingKeys: String, CodingKey {
             case operations
             case initialSnapshot
+            case initialSha256
             case summary
             case logID
         }
 
-        init(logID: LogID, initialSnapshot: LogSnapshot, operations: [LoggedOperation], summary: Summary) {
+        init(logID: LogID, initialSnapshot: InitialSnapshot, operations: [LoggedOperation], summary: Summary) {
             self.initialSnapshot = initialSnapshot
             self.operations = operations
             self.summary = summary
@@ -237,18 +253,22 @@ extension OperationLog {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
+            let logID = try container.decode(LogID.self, forKey: .logID)
+            let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? Data() // use logID
             self.summary = try container.decode(Summary.self, forKey: .summary)
-            self.initialSnapshot = try LogSnapshot.deserialize(fromData: snapshotData)
+            self.initialSnapshot = .init(snapshot: try LogSnapshot.deserialize(fromData: snapshotData),
+                                         sha256: initialSha256)
             self.operations = try container.decode([LoggedOperation].self, forKey: .operations)
-            self.logID = try container.decode(LogID.self, forKey: .logID)
+            self.logID = logID
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(self.operations, forKey: .operations)
             try container.encode(self.summary, forKey: .summary)
-            let snapshotData = try self.initialSnapshot.serialize()
+            let snapshotData = try self.initialSnapshot.snapshot.serialize()
             try container.encode(snapshotData, forKey: .initialSnapshot)
+            try container.encode(self.initialSnapshot.sha256, forKey: .initialSha256)
             try container.encode(self.logID, forKey: .logID)
         }
     }
@@ -305,7 +325,7 @@ private extension OperationLog {
 
     /// Recalculates the most recent snapshot by applying all operations onto the initial snapshot
     mutating func recalculateMostRecentSnapshot() {
-        var currentSnapshot = self.initialSnapshot
+        var currentSnapshot = self.initialSnapshot.snapshot
         var currentSummary = self.initialSummary
         var currentUndoStack: [Operation] = []
         for operation in self.operations {

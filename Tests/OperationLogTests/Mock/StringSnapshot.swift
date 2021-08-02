@@ -19,6 +19,10 @@ struct StringSnapshot: SnapshotProtocol {
 
     // MARK: - StringSnapshot
 
+    static func makeEmptySnapshot() -> StringSnapshot {
+        return .init(string: "")
+    }
+
     func applying(_ operation: CharacterOperation) -> (snapshot: StringSnapshot, outcome: Outcome<CharacterOperation>) {
         switch operation.kind {
         case .append:

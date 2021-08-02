@@ -5,8 +5,8 @@ import XCTest
 final class SummaryTests: XCTestCase {
 
     func testSummaryConstruction() throws {
-        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
-        var logB = CharacterOperationLog(logID: "1", actorID: "B", initialSnapshot: .init(string: "Result: "))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
         logB.append(.init(kind: .append, character: "X"))
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
@@ -21,7 +21,7 @@ final class SummaryTests: XCTestCase {
     }
 
     func testPersistence() throws {
-        var logA = CharacterOperationLog(logID: "1", actorID: "A", initialSnapshot: .init(string: "Result: "))
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
         logA.append(.init(kind: .append, character: "C"))
