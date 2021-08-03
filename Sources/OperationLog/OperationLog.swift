@@ -94,7 +94,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
 
-        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: UUID().data)
+        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: Data(count: 32))
         self.snapshot = initialSnapshot.snapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
@@ -131,7 +131,19 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Merge another operation log into the current one
     /// - Parameter operationLog: The log which should be merged
     public mutating func merge(_ operationLog: OperationLog) throws {
-        try self.insert(operationLog.operations)
+        guard self.logID == operationLog.logID else { throw Error.nonMatchingLogIDs }
+
+        var other = operationLog
+        if self.initialSnapshot.sha256 != operationLog.initialSnapshot.sha256 {
+            print("SHA256 \(self.initialSnapshot.sha256.base64EncodedString()) vs \(other.initialSnapshot.sha256.base64EncodedString())")
+            if self.initialSummary.latestClock.totalOrder(other: operationLog.initialSummary.latestClock) == .descending {
+                try other.reduce(until: self.initialSnapshot.sha256)
+            } else {
+                try self.reduce(until: other.initialSnapshot.sha256)
+            }
+        }
+
+        try self.insert(other.operations)
     }
 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
@@ -222,6 +234,7 @@ public extension OperationLog {
     enum Error: Swift.Error {
         case unknownOperationID(UUID)
         case mergeNotPossible
+        case nonMatchingLogIDs
     }
 
     mutating func reduce(until operationID: UUID) throws {
@@ -229,18 +242,57 @@ public extension OperationLog {
         var initialSummary = self.initialSummary
         var hash = SHA256()
         var cutoffIndex: Int?
+        print("Initial \(self.initialSnapshot.sha256.base64EncodedString())")
         hash.update(data: self.initialSnapshot.sha256)
         for (index, loggedOperation) in self.operations.enumerated() {
             let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
+            print("Insert \(loggedOperation.id)")
             hash.update(data: loggedOperation.id.data)
+
+            var copied = hash
+            print("new SHA256 \(Data(copied.finalize()).base64EncodedString())")
             if loggedOperation.id == operationID {
                 cutoffIndex = index
                 break
             }
         }
         guard let cutoffIndex = cutoffIndex else { throw Error.unknownOperationID(operationID) }
+
+        let newStartIndex = cutoffIndex + 1
+        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
+        self.initialSummary = initialSummary
+        if newStartIndex >= self.operations.count {
+            self.operations = []
+        } else {
+            self.operations = Array(self.operations.suffix(from: cutoffIndex + 1))
+        }
+        self.recalculateMostRecentSnapshot()
+    }
+
+    mutating func reduce(until targetHash: Data) throws {
+        var initialSnapshot = self.initialSnapshot.snapshot
+        var initialSummary = self.initialSummary
+        var hash = SHA256()
+        var cutoffIndex: Int?
+        print("Initial \(self.initialSnapshot.sha256.base64EncodedString())")
+        hash.update(data: self.initialSnapshot.sha256)
+        for (index, loggedOperation) in self.operations.enumerated() {
+            let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
+            initialSnapshot = snapshot
+            initialSummary.apply(loggedOperation, outcome: outcome)
+            print("Insert \(loggedOperation.id)")
+            hash.update(data: loggedOperation.id.data)
+            let copiedHash = hash
+            let hashData = Data(copiedHash.finalize())
+            print("SHA256 \(hashData.base64EncodedString())")
+            if hashData == targetHash {
+                cutoffIndex = index
+                break
+            }
+        }
+        guard let cutoffIndex = cutoffIndex else { throw Error.mergeNotPossible }
 
         let newStartIndex = cutoffIndex + 1
         self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
@@ -294,7 +346,7 @@ extension OperationLog {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
             let logID = try container.decode(LogID.self, forKey: .logID)
-            let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? UUID().data
+            let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? Data(count: 32)
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = .init(snapshot: try LogSnapshot.deserialize(fromData: snapshotData),
                                          sha256: initialSha256)
@@ -422,7 +474,7 @@ private extension Array {
 private extension UUID {
 
     var data: Data {
-        let (u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16) = UUID().uuid
+        let (u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16) = self.uuid
         let uuidBytes = [u1,u2,u3,u4,u5,u6,u7,u8,u9,u10,u11,u12,u13,u14,u15,u16]
         return .init(uuidBytes)
     }

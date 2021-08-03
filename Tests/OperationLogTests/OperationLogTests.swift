@@ -159,6 +159,29 @@ extension OperationLogTests {
         XCTAssertEqual(logB.snapshot.string, "ABX")
         XCTAssertEqual(logB.operations.count, 3)
     }
+
+    func testMergeWithReducedLog() throws {
+        // Preparation
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
+        logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "B"))
+        try logB.merge(logA)
+        logB.append(.init(kind: .append, character: "X"))
+        logA.append(.init(kind: .append, character: "C"))
+        XCTAssertEqual(logA.snapshot.string, "ABC")
+        XCTAssertEqual(logA.operations.count, 3)
+        XCTAssertEqual(logB.snapshot.string, "ABX")
+        XCTAssertEqual(logB.operations.count, 3)
+
+        // Reduce logA and merge afterwards
+        try logA.reduce(until: logA.operations[1].id)
+        XCTAssertNoThrow(try logA.merge(logB))
+        XCTAssertEqual(logA.snapshot.string, "ABXC")
+        XCTAssertEqual(logA.operations.count, 2)
+        XCTAssertEqual(logB.snapshot.string, "ABX")
+        XCTAssertEqual(logB.operations.count, 3)
+    }
 }
 
 // MARK: - Performance Tests
