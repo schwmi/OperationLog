@@ -14,7 +14,7 @@ final class SummaryTests: XCTestCase {
         XCTAssertEqual(logA.summary.actors, ["A"])
         XCTAssertEqual(logA.summary.operationCount, 3)
 
-        logA.merge(logB)
+        try logA.merge(logB)
         XCTAssertEqual(logA.summary.actors, ["A", "B"])
         XCTAssertEqual(logA.summary.operationCount, 4)
         XCTAssertEqual(logA.summary.operationInfos.count, 4)

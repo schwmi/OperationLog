@@ -13,38 +13,38 @@ final class OperationLogTests: XCTestCase {
         XCTAssertEqual(log.snapshot.string, "ABC")
     }
 
-    func testLogMerging() {
+    func testLogMerging() throws {
         var logA = CharacterOperationLog(logID: "1", actorID: "A")
         var logB = CharacterOperationLog(logID: "1", actorID: "B")
         logA.append(.init(kind: .append, character: "A"))
         logA.append(.init(kind: .append, character: "B"))
         logA.append(.init(kind: .append, character: "C"))
         logB.append(.init(kind: .append, character: "D"))
-        logB.merge(logA)
-        logB.merge(logB)
+        try logB.merge(logA)
+        try logB.merge(logB)
         XCTAssertEqual(logB.snapshot.string, "ABCD")
         logA.append(.init(kind: .append, character: "E"))
         logA.append(.init(kind: .append, character: "F"))
-        logB.merge(logA)
+        try logB.merge(logA)
         logA.append(.init(kind: .append, character: "G"))
         logB.append(.init(kind: .append, character: "H"))
-        logA.merge(logB)
+        try logA.merge(logB)
         logB.append(.init(kind: .append, character: "I"))
         logB.append(.init(kind: .append, character: "J"))
-        logA.merge(logB)
-        logB.merge(logA)
+        try logA.merge(logB)
+        try logB.merge(logA)
         XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)
         XCTAssertEqual(logA.snapshot.string, "ABCDEFGHIJ")
     }
 
-    func testMergeNoOp() {
+    func testMergeNoOp() throws {
         var log = CharacterOperationLog(logID: "1", actorID: "A")
         log.append(.init(kind: .append, character: "A"))
         log.append(.init(kind: .append, character: "B"))
         log.undo()
         XCTAssertTrue(log.canUndo)
         XCTAssertTrue(log.canRedo)
-        log.merge(log)
+        try log.merge(log)
         XCTAssertTrue(log.canUndo)
         XCTAssertTrue(log.canRedo)
     }
@@ -136,6 +136,29 @@ extension OperationLogTests {
             XCTAssertThrowsError(try copiedLog.reduce(until: UUID()))
         }
     }
+
+    func testInsertingInReducedLog() throws {
+        // Preparation
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
+        logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "B"))
+        try logB.merge(logA)
+        logB.append(.init(kind: .append, character: "X"))
+        logA.append(.init(kind: .append, character: "C"))
+        XCTAssertEqual(logA.snapshot.string, "ABC")
+        XCTAssertEqual(logA.operations.count, 3)
+        XCTAssertEqual(logB.snapshot.string, "ABX")
+        XCTAssertEqual(logB.operations.count, 3)
+
+        // Reduce logA and try to insert earlier operation - should throw an error
+        try logA.reduce(until: logA.operations[2].id)
+        XCTAssertThrowsError(try logA.insert([logB.operations[2]]))
+        XCTAssertEqual(logA.snapshot.string, "ABC")
+        XCTAssertEqual(logA.operations.count, 0)
+        XCTAssertEqual(logB.snapshot.string, "ABX")
+        XCTAssertEqual(logB.operations.count, 3)
+    }
 }
 
 // MARK: - Performance Tests
@@ -161,7 +184,7 @@ extension OperationLogTests {
         // Merge operations one by one into log b
         self.measure {
             for operation in logA.operations {
-                logB.insert([operation])
+                try? logB.insert([operation])
             }
         }
         XCTAssertEqual(logA.snapshot.string, logB.snapshot.string)

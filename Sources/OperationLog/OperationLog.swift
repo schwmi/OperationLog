@@ -130,8 +130,8 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
     /// Merge another operation log into the current one
     /// - Parameter operationLog: The log which should be merged
-    public mutating func merge(_ operationLog: OperationLog) {
-        self.insert(operationLog.operations)
+    public mutating func merge(_ operationLog: OperationLog) throws {
+        try self.insert(operationLog.operations)
     }
 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
@@ -145,9 +145,11 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// Insert an array of LoggedOperation into a log - normally those are operations which where added into another log and are now
     /// synced to the current log
     /// - Parameter operations: The LoggedOperations which should be added
-    public mutating func insert(_ operations: [LoggedOperation]) {
+    public mutating func insert(_ operations: [LoggedOperation]) throws {
         let sortedInsertOperations = operations.sorted(by: { $0.clock.totalOrder(other: $1.clock) == .descending })
         guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
+        guard let earliestClockInserted = sortedInsertOperations.last?.clock else { return }
+        guard earliestClockInserted.totalOrder(other: self.initialSummary.latestClock) == .descending else { throw Error.mergeNotPossible }
 
         self.clockProvider.merge(latestClockInserted)
 
@@ -219,6 +221,7 @@ public extension OperationLog {
 
     enum Error: Swift.Error {
         case unknownOperationID(UUID)
+        case mergeNotPossible
     }
 
     mutating func reduce(until operationID: UUID) throws {
