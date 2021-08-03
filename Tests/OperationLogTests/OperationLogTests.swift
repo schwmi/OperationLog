@@ -99,6 +99,45 @@ final class OperationLogTests: XCTestCase {
     }
 }
 
+// MARK: - Reducing Tests
+
+extension OperationLogTests {
+
+    func testReducingLog() throws {
+        // Preparation
+        var log = CharacterOperationLog(logID: "1", actorID: "A")
+        log.append(.init(kind: .append, character: "A"))
+        log.append(.init(kind: .append, character: "B"))
+        log.append(.init(kind: .append, character: "C"))
+        XCTAssertEqual(log.snapshot.string, "ABC")
+        XCTAssertEqual(log.operations.count, 3)
+
+        // Cutoff in the middle
+        do {
+            var copiedLog = log
+            let secondOperation = copiedLog.operations[1]
+            try copiedLog.reduce(until: secondOperation.id)
+            XCTAssertEqual(copiedLog.snapshot.string, log.snapshot.string)
+            XCTAssertEqual(copiedLog.operations.count, 1)
+        }
+
+        // Cutoff at the end
+        do {
+            var copiedLog = log
+            let lastOperation = copiedLog.operations[2]
+            try copiedLog.reduce(until: lastOperation.id)
+            XCTAssertEqual(copiedLog.snapshot.string, log.snapshot.string)
+            XCTAssertEqual(copiedLog.operations.count, 0)
+        }
+
+        // Try to cutoff non-existent operation
+        do {
+            var copiedLog = log
+            XCTAssertThrowsError(try copiedLog.reduce(until: UUID()))
+        }
+    }
+}
+
 // MARK: - Performance Tests
 
 extension OperationLogTests {

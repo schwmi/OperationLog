@@ -211,8 +211,17 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                                   summary: self.initialSummary)
         return try JSONEncoder().encode(container)
     }
+}
 
-    public mutating func reduce(until operationID: UUID) throws {
+// MARK: - Log Reducing
+
+public extension OperationLog {
+
+    enum Error: Swift.Error {
+        case unknownOperationID(UUID)
+    }
+
+    mutating func reduce(until operationID: UUID) throws {
         var initialSnapshot = self.initialSnapshot.snapshot
         var initialSummary = self.initialSummary
         var hash = SHA256()
@@ -228,11 +237,16 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                 break
             }
         }
-        guard let cutoffIndex = cutoffIndex else { return }
+        guard let cutoffIndex = cutoffIndex else { throw Error.unknownOperationID(operationID) }
 
+        let newStartIndex = cutoffIndex + 1
         self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
         self.initialSummary = initialSummary
-        self.operations = Array(self.operations.suffix(from: cutoffIndex))
+        if newStartIndex >= self.operations.count {
+            self.operations = []
+        } else {
+            self.operations = Array(self.operations.suffix(from: cutoffIndex + 1))
+        }
         self.recalculateMostRecentSnapshot()
     }
 }
