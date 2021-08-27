@@ -229,43 +229,20 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 public extension OperationLog {
 
     enum Error: Swift.Error {
-        case unknownOperationID(UUID)
+        case reduceNotPossible
         case mergeNotPossible
         case nonMatchingLogIDs
     }
 
     mutating func reduce(until operationID: UUID) throws {
-        var initialSnapshot = self.initialSnapshot.snapshot
-        var initialSummary = self.initialSummary
-        var hash = SHA256()
-        var cutoffIndex: Int?
-        hash.update(data: self.initialSnapshot.sha256)
-        for (index, loggedOperation) in self.operations.enumerated() {
-            let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
-            initialSnapshot = snapshot
-            initialSummary.apply(loggedOperation, outcome: outcome)
-            hash.update(data: loggedOperation.id.data)
-
-            var copied = hash
-            if loggedOperation.id == operationID {
-                cutoffIndex = index
-                break
-            }
-        }
-        guard let cutoffIndex = cutoffIndex else { throw Error.unknownOperationID(operationID) }
-
-        let newStartIndex = cutoffIndex + 1
-        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
-        self.initialSummary = initialSummary
-        if newStartIndex >= self.operations.count {
-            self.operations = []
-        } else {
-            self.operations = Array(self.operations.suffix(from: cutoffIndex + 1))
-        }
-        self.recalculateMostRecentSnapshot()
+        try self.reduce(until: { operation, _ in operation.id == operationID })
     }
 
     mutating func reduce(until targetHash: Data) throws {
+        try self.reduce(until: { _, hash in Data(hash.finalize()) == targetHash })
+    }
+
+    mutating func reduce(until matching: (LoggedOperation, SHA256) -> Bool) throws {
         var initialSnapshot = self.initialSnapshot.snapshot
         var initialSummary = self.initialSummary
         var hash = SHA256()
@@ -276,14 +253,12 @@ public extension OperationLog {
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
             hash.update(data: loggedOperation.id.data)
-            let copiedHash = hash
-            let hashData = Data(copiedHash.finalize())
-            if hashData == targetHash {
+            if matching(loggedOperation, hash) {
                 cutoffIndex = index
                 break
             }
         }
-        guard let cutoffIndex = cutoffIndex else { throw Error.mergeNotPossible }
+        guard let cutoffIndex = cutoffIndex else { throw Error.reduceNotPossible }
 
         let newStartIndex = cutoffIndex + 1
         self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
