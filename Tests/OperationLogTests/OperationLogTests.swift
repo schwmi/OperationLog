@@ -181,6 +181,13 @@ extension OperationLogTests {
         XCTAssertEqual(logA.operations.count, 2)
         XCTAssertEqual(logB.snapshot.string, "ABX")
         XCTAssertEqual(logB.operations.count, 3)
+
+        // Merge reduced log into B
+        XCTAssertNoThrow(try logB.merge(logA))
+        XCTAssertEqual(logA.operations.count, 2)
+        XCTAssertEqual(logA.snapshot.string, "ABXC")
+        XCTAssertEqual(logB.operations.count, 4)
+        XCTAssertEqual(logB.snapshot.string, "ABXC")
     }
 }
 

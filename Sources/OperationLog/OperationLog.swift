@@ -133,17 +133,14 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public mutating func merge(_ operationLog: OperationLog) throws {
         guard self.logID == operationLog.logID else { throw Error.nonMatchingLogIDs }
 
-        var other = operationLog
+        var otherLog = operationLog
         if self.initialSnapshot.sha256 != operationLog.initialSnapshot.sha256 {
-            print("SHA256 \(self.initialSnapshot.sha256.base64EncodedString()) vs \(other.initialSnapshot.sha256.base64EncodedString())")
-            if self.initialSummary.latestClock.totalOrder(other: operationLog.initialSummary.latestClock) == .descending {
-                try other.reduce(until: self.initialSnapshot.sha256)
-            } else {
-                try self.reduce(until: other.initialSnapshot.sha256)
+            if self.initialSummary.latestClock.totalOrder(other: otherLog.initialSummary.latestClock) == .descending {
+                try otherLog.reduce(until: self.initialSnapshot.sha256)
             }
         }
 
-        try self.insert(other.operations)
+        try self.insert(otherLog.operations)
     }
 
     /// Append a new operation onto the log, the operation is wrapped into a container and a new timestamp is created
@@ -242,17 +239,14 @@ public extension OperationLog {
         var initialSummary = self.initialSummary
         var hash = SHA256()
         var cutoffIndex: Int?
-        print("Initial \(self.initialSnapshot.sha256.base64EncodedString())")
         hash.update(data: self.initialSnapshot.sha256)
         for (index, loggedOperation) in self.operations.enumerated() {
             let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
-            print("Insert \(loggedOperation.id)")
             hash.update(data: loggedOperation.id.data)
 
             var copied = hash
-            print("new SHA256 \(Data(copied.finalize()).base64EncodedString())")
             if loggedOperation.id == operationID {
                 cutoffIndex = index
                 break
@@ -276,17 +270,14 @@ public extension OperationLog {
         var initialSummary = self.initialSummary
         var hash = SHA256()
         var cutoffIndex: Int?
-        print("Initial \(self.initialSnapshot.sha256.base64EncodedString())")
         hash.update(data: self.initialSnapshot.sha256)
         for (index, loggedOperation) in self.operations.enumerated() {
             let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
-            print("Insert \(loggedOperation.id)")
             hash.update(data: loggedOperation.id.data)
             let copiedHash = hash
             let hashData = Data(copiedHash.finalize())
-            print("SHA256 \(hashData.base64EncodedString())")
             if hashData == targetHash {
                 cutoffIndex = index
                 break
