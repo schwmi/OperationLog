@@ -246,7 +246,7 @@ public extension OperationLog {
         try self.reduce(until: { _, hash in Data(hash.finalize()) == targetHash })
     }
 
-    mutating func reduce(until matching: (LoggedOperation, SHA256) -> Bool) throws {
+    mutating func reduce(until condition: (LoggedOperation, SHA256) -> Bool) throws {
         var initialSnapshot = self.initialSnapshot.snapshot
         var initialSummary = self.initialSummary
         var hash = SHA256()
@@ -259,7 +259,7 @@ public extension OperationLog {
             initialSummary.apply(loggedOperation, outcome: outcome)
             hash.update(data: loggedOperation.id.data)
             lastClock = loggedOperation.clock
-            if matching(loggedOperation, hash) {
+            if condition(loggedOperation, hash) {
                 cutoffIndex = index
                 break
             }
