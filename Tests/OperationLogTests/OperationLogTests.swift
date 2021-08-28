@@ -188,6 +188,26 @@ extension OperationLogTests {
         XCTAssertEqual(logA.snapshot.string, "ABXC")
         XCTAssertEqual(logB.operations.count, 4)
         XCTAssertEqual(logB.snapshot.string, "ABXC")
+
+        // Reduce all remaining operations in logB
+        try logA.merge(logB)
+        logA.append(.init(kind: .append, character: "D"))
+        XCTAssertEqual(logA.snapshot.string, "ABXCD")
+        try logB.merge(logA)
+        try logB.reduce(until: logB.operations.last!.id)
+        XCTAssertEqual(logB.snapshot.string, "ABXCD")
+        XCTAssertEqual(logB.operations.count, 0)
+
+        // Now serialize logB and load again - add an operation and ensure clock is correct
+        // by adding operation to logB
+        let logData = try logB.serialize()
+        var deserializedLogB = try CharacterOperationLog(actorID: "B", data: logData)
+        deserializedLogB.append(.init(kind: .append, character: "L"))
+        XCTAssertEqual(deserializedLogB.snapshot.string, "ABXCDL")
+        try logA.merge(deserializedLogB)
+        XCTAssertEqual(logA.snapshot.string, "ABXCDL")
+        XCTAssertEqual(logA.operations.count, 4)
+        XCTAssertEqual(deserializedLogB.operations.count, 1)
     }
 }
 
