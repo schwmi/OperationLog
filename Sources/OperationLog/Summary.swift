@@ -115,5 +115,3 @@ extension OperationLog.Summary.AppliedOperation.ApplyType: Codable {
 
     }
 }
-
-

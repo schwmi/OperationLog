@@ -39,10 +39,12 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     public struct InitialSnapshot {
         public let snapshot: LogSnapshot
         public let sha256: Data
+        public let clock: VectorClock<ActorID>?
 
-        public init(snapshot: LogSnapshot, sha256: Data) {
+        public init(snapshot: LogSnapshot, sha256: Data, clock: VectorClock<ActorID>?) {
             self.snapshot = snapshot
             self.sha256 = sha256
+            self.clock = clock
         }
     }
 
@@ -94,7 +96,9 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         self.actorID = actorID
         self.clockProvider = .init(actorID: actorID, vectorClock: .init(actorID: actorID))
 
-        self.initialSnapshot = .init(snapshot: emptySnapshot, sha256: Data(count: 32))
+        self.initialSnapshot = .init(snapshot: emptySnapshot,
+                                     sha256: Data(count: 32),
+                                     clock: nil)
         self.snapshot = initialSnapshot.snapshot
         let summary: Summary = .init(actors: [actorID],
                                      latestClock: .init(actorID: actorID),
@@ -114,7 +118,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         let container = try JSONDecoder().decode(Container.self, from: data)
         precondition(container.operations.isSorted(isOrderedBefore: { $0.clock.totalOrder(other: $1.clock) == .ascending }), "Operations should be persisted in a sorted state")
         self.actorID = actorID
-        let clock = container.operations.last?.clock ?? .init(actorID: actorID)
+        let clock = container.operations.last?.clock ?? container.initialSnapshot.clock ?? .init(actorID: actorID)
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
         self.operations = container.operations
         self.initialSnapshot = container.initialSnapshot
@@ -248,11 +252,13 @@ public extension OperationLog {
         var hash = SHA256()
         var cutoffIndex: Int?
         hash.update(data: self.initialSnapshot.sha256)
+        var lastClock: VectorClock<ActorID>?
         for (index, loggedOperation) in self.operations.enumerated() {
             let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
             hash.update(data: loggedOperation.id.data)
+            lastClock = loggedOperation.clock
             if matching(loggedOperation, hash) {
                 cutoffIndex = index
                 break
@@ -261,13 +267,13 @@ public extension OperationLog {
         guard let cutoffIndex = cutoffIndex else { throw Error.reduceNotPossible }
 
         let newStartIndex = cutoffIndex + 1
-        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()))
         self.initialSummary = initialSummary
         if newStartIndex >= self.operations.count {
             self.operations = []
         } else {
             self.operations = Array(self.operations.suffix(from: cutoffIndex + 1))
         }
+        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()), clock: lastClock ?? .init(actorID: self.actorID))
         self.recalculateMostRecentSnapshot()
     }
 }
@@ -297,6 +303,7 @@ extension OperationLog {
             case operations
             case initialSnapshot
             case initialSha256
+            case initialClock
             case summary
             case logID
         }
@@ -313,9 +320,11 @@ extension OperationLog {
             let snapshotData = try container.decode(Data.self, forKey: .initialSnapshot)
             let logID = try container.decode(LogID.self, forKey: .logID)
             let initialSha256 = try container.decodeIfPresent(Data.self, forKey: .initialSha256) ?? Data(count: 32)
+            let initialClock = try container.decodeIfPresent(VectorClock<ActorID>.self, forKey: .initialClock)
             self.summary = try container.decode(Summary.self, forKey: .summary)
             self.initialSnapshot = .init(snapshot: try LogSnapshot.deserialize(fromData: snapshotData),
-                                         sha256: initialSha256)
+                                         sha256: initialSha256,
+                                         clock: initialClock)
             self.operations = try container.decode([LoggedOperation].self, forKey: .operations)
             self.logID = logID
         }
@@ -328,6 +337,7 @@ extension OperationLog {
             try container.encode(snapshotData, forKey: .initialSnapshot)
             try container.encode(self.initialSnapshot.sha256, forKey: .initialSha256)
             try container.encode(self.logID, forKey: .logID)
+            try container.encode(self.initialSnapshot.clock, forKey: .initialClock)
         }
     }
 }
