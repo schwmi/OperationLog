@@ -209,6 +209,22 @@ extension OperationLogTests {
         XCTAssertEqual(logA.operations.count, 4)
         XCTAssertEqual(deserializedLogB.operations.count, 1)
     }
+
+    func testSpaceReductionAfterReducing() throws {
+        // Create and add 1000 characters, remove 500 afterwards
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        stride(from: 0, to: 1000, by: 1).forEach { _ in logA.append(.init(kind: .append, character: "A")) }
+        stride(from: 0, to: 500, by: 1).forEach { _ in logA.append(.init(kind: .removeLast, character: "A")) }
+        let resultingString = logA.snapshot.string
+        let unreducedLogData = try logA.serialize()
+
+        try logA.reduce(until: logA.operations.last!.id)
+        let reducedLogData = try logA.serialize()
+        print(reducedLogData.count)
+        print(unreducedLogData.count)
+        XCTAssertLessThan(reducedLogData.count, unreducedLogData.count)
+        XCTAssertEqual(logA.snapshot.string, resultingString)
+    }
 }
 
 // MARK: - Performance Tests
