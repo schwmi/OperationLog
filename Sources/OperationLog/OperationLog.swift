@@ -34,11 +34,12 @@ public typealias Identifier = Comparable & Hashable & Codable
 ///    - Snapshot … State at a given point in time, where all operations are reduced into
 public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: SnapshotProtocol> {
 
+    public typealias Sha256Data = Data
     public typealias Operation = LogSnapshot.Operation
 
     public struct InitialSnapshot {
         public let snapshot: LogSnapshot
-        public let sha256: Data
+        public let sha256: Sha256Data
         public let clock: VectorClock<ActorID>?
 
         public init(snapshot: LogSnapshot, sha256: Data, clock: VectorClock<ActorID>?) {
@@ -149,6 +150,10 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
         if self.initialSnapshot.sha256 != operationLog.initialSnapshot.sha256 {
             if self.initialSummary.latestClock.totalOrder(other: otherLog.initialSummary.latestClock) == .descending {
                 try otherLog.reduce(until: self.initialSnapshot.sha256)
+            } else {
+                var copy = self
+                // We ensure that we also have the same history (but do not reduce collapse the operations here).
+                try copy.reduce(until: otherLog.initialSnapshot.sha256)
             }
         }
 
@@ -250,24 +255,29 @@ public extension OperationLog {
         try self.reduce(until: { operation, _ in operation.id == operationID })
     }
 
-    mutating func reduce(until targetHash: Data) throws {
-        try self.reduce(until: { _, hash in Data(hash.finalize()) == targetHash })
+    mutating func reduce(until targetHash: Sha256Data) throws {
+        try self.reduce(until: { _, hash in hash == targetHash })
     }
 
-    mutating func reduce(until condition: (LoggedOperation, SHA256) -> Bool) throws {
+    mutating func reduce(until condition: (LoggedOperation, Sha256Data) -> Bool) throws {
         var initialSnapshot = self.initialSnapshot.snapshot
         var initialSummary = self.initialSummary
-        var hash = SHA256()
+        var formerHash = self.initialSnapshot.sha256
         var cutoffIndex: Int?
-        hash.update(data: self.initialSnapshot.sha256)
+        print("Initial \(Array(self.initialSnapshot.sha256))")
         var lastClock: VectorClock<ActorID>?
         for (index, loggedOperation) in self.operations.enumerated() {
+            print("Reduce operation \(loggedOperation.id) into hash")
             let (snapshot, outcome) = initialSnapshot.applying(loggedOperation.operation)
             initialSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
-            hash.update(data: loggedOperation.id.data)
+            var sha256 = SHA256()
+            sha256.update(data: formerHash)
+            sha256.update(data: loggedOperation.id.data)
+            let currentHash = Data(sha256.finalize())
+            formerHash = currentHash
             lastClock = loggedOperation.clock
-            if condition(loggedOperation, hash) {
+            if condition(loggedOperation, currentHash) {
                 cutoffIndex = index
                 break
             }
@@ -281,7 +291,7 @@ public extension OperationLog {
         } else {
             self.operations = Array(self.operations.suffix(from: cutoffIndex + 1))
         }
-        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: Data(hash.finalize()), clock: lastClock ?? .init(actorID: self.actorID))
+        self.initialSnapshot = .init(snapshot: initialSnapshot, sha256: formerHash, clock: lastClock ?? .init(actorID: self.actorID))
         self.recalculateMostRecentSnapshot()
     }
 }

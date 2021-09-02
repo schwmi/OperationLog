@@ -176,6 +176,7 @@ extension OperationLogTests {
 
         // Reduce logA and merge afterwards
         try logA.reduce(until: logA.operations[1].id)
+        XCTAssertEqual(logA.operations.count, 1)
         XCTAssertNoThrow(try logA.merge(logB))
         XCTAssertEqual(logA.snapshot.string, "ABXC")
         XCTAssertEqual(logA.operations.count, 2)
@@ -208,6 +209,29 @@ extension OperationLogTests {
         XCTAssertEqual(logA.snapshot.string, "ABXCDL")
         XCTAssertEqual(logA.operations.count, 4)
         XCTAssertEqual(deserializedLogB.operations.count, 1)
+    }
+
+    func testMergeThrowingErrors() throws {
+        // Preparation
+        var logA = CharacterOperationLog(logID: "1", actorID: "A")
+        var logB = CharacterOperationLog(logID: "1", actorID: "B")
+        logA.append(.init(kind: .append, character: "A"))
+        logA.append(.init(kind: .append, character: "B"))
+        try logB.merge(logA)
+        logB.append(.init(kind: .append, character: "X"))
+        logA.append(.init(kind: .append, character: "C"))
+        XCTAssertEqual(logA.snapshot.string, "ABC")
+        XCTAssertEqual(logA.operations.count, 3)
+        XCTAssertEqual(logB.snapshot.string, "ABX")
+        XCTAssertEqual(logB.operations.count, 3)
+
+        // Now reduce full logA and try to merge logB
+        try logA.reduce(until: logA.operations.last!.id)
+        logA.append(.init(kind: .append, character: "K"))
+        XCTAssertThrowsError(try logA.merge(logB))
+        XCTAssertEqual(logA.snapshot.string, "ABCK")
+        XCTAssertThrowsError(try logB.merge(logA))
+        XCTAssertEqual(logB.snapshot.string, "ABX")
     }
 
     func testSpaceReductionAfterReducing() throws {
