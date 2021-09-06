@@ -266,10 +266,8 @@ public extension OperationLog {
         var initialSummary = self.initialSummary
         var formerHash = self.baseSnapshot.sha256
         var cutoffIndex: Int?
-        print("Initial \(Array(self.baseSnapshot.sha256))")
         var lastClock: VectorClock<ActorID>?
         for (index, loggedOperation) in self.operations.enumerated() {
-            print("Reduce operation \(loggedOperation.id) into hash")
             let (snapshot, outcome) = baseSnapshot.applying(loggedOperation.operation)
             baseSnapshot = snapshot
             initialSummary.apply(loggedOperation, outcome: outcome)
@@ -321,7 +319,7 @@ extension OperationLog {
 
         enum CodingKeys: String, CodingKey {
             case operations
-            case baseSnapshot
+            case baseSnapshot = "initialSnapshot"
             case initialSha256
             case initialClock
             case summary
