@@ -185,8 +185,6 @@ extension OperationLogTests {
 
         // Merge reduced log into B
         XCTAssertNoThrow(try logB.merge(logA))
-        XCTAssertEqual(logA.operations.count, 2)
-        XCTAssertEqual(logA.snapshot.string, "ABXC")
         XCTAssertEqual(logB.operations.count, 4)
         XCTAssertEqual(logB.snapshot.string, "ABXC")
 
@@ -244,8 +242,6 @@ extension OperationLogTests {
 
         try logA.reduce(until: logA.operations.last!.id)
         let reducedLogData = try logA.serialize()
-        print(reducedLogData.count)
-        print(unreducedLogData.count)
         XCTAssertLessThan(reducedLogData.count, unreducedLogData.count)
         XCTAssertEqual(logA.snapshot.string, resultingString)
     }

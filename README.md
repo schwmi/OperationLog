@@ -9,7 +9,7 @@ For using the log you have to implement the `LogOperation` and `Snapshot` protoc
 ### Create a new log
 ```
 let stringSnapshot = StringSnapshot("") // StringSnapshot is an implementation of the `Snapshot` protocol
-let log = OperationLog(logID: "XYZ", actorID: "A", initialSnapshot: stringSnapshot)
+let log = OperationLog(logID: "XYZ", actorID: "A", baseSnapshot: stringSnapshot)
 ```
 
 ### Append operations
