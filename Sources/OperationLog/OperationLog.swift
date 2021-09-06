@@ -127,7 +127,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// - Throws: if decoding of data fails
     public init(actorID: ActorID, data: Data) throws {
         let container = try JSONDecoder().decode(Container.self, from: data)
-        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock.totalOrder(other: $1.clock) == .ascending }), "Operations should be persisted in a sorted state")
+        precondition(container.operations.isSorted(isOrderedBefore: { $0.clock.isOlderInTotalOrder(than: $1.clock) }), "Operations should be persisted in a sorted state")
         self.actorID = actorID
         let clock = container.operations.last?.clock ?? container.baseSnapshot.clock ?? .init(actorID: actorID)
         self.clockProvider = .init(actorID: actorID, vectorClock: clock)
@@ -150,7 +150,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
 
         var otherLog = operationLog
         if self.baseSnapshot.sha256 != operationLog.baseSnapshot.sha256 {
-            if self.initialSummary.latestClock.totalOrder(other: otherLog.initialSummary.latestClock) == .descending {
+            if self.initialSummary.latestClock.isNewerInTotalOrder(than: otherLog.initialSummary.latestClock) {
                 try otherLog.reduce(until: self.baseSnapshot.sha256)
             } else {
                 var copy = self
@@ -174,10 +174,10 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
     /// synced to the current log
     /// - Parameter operations: The LoggedOperations which should be added
     public mutating func insert(_ operations: [LoggedOperation]) throws {
-        let sortedInsertOperations = operations.sorted(by: { $0.clock.totalOrder(other: $1.clock) == .descending })
+        let sortedInsertOperations = operations.sorted(by: { $0.clock.isNewerInTotalOrder(than: $1.clock) })
         guard let latestClockInserted = sortedInsertOperations.first?.clock else { return }
         guard let earliestClockInserted = sortedInsertOperations.last?.clock else { return }
-        guard earliestClockInserted.totalOrder(other: self.initialSummary.latestClock) == .descending else { throw Error.mergeNotPossible }
+        guard earliestClockInserted.isNewerInTotalOrder(than: self.initialSummary.latestClock) else { throw Error.mergeNotPossible }
 
         self.clockProvider.merge(latestClockInserted)
 
@@ -194,7 +194,7 @@ public struct OperationLog<LogID: Identifier, ActorID: Identifier, LogSnapshot: 
                     if currentOperation.id == operation.id {
                         searchStartIndex = index
                         break
-                    } else if currentOperation.clock.totalOrder(other: operation.clock) == .ascending {
+                    } else if currentOperation.clock.isOlderInTotalOrder(than: operation.clock) {
                         resultingArray.insert(operation, at: index + 1)
                         searchStartIndex = index
                         break
@@ -479,4 +479,15 @@ private extension UUID {
 private extension Data {
 
     static let emptySizedLikeSHA256Hash = Data(count: 32)
+}
+
+private extension VectorClock {
+
+    func isNewerInTotalOrder(than other: VectorClock) -> Bool {
+        return self.totalOrder(other: other) == .descending
+    }
+
+    func isOlderInTotalOrder(than other: VectorClock) -> Bool {
+        return self.totalOrder(other: other) == .ascending
+    }
 }
